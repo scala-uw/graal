@@ -129,6 +129,14 @@ public final class ParserSymbols {
         public static final Symbol<Name> StackMapTable = SYMBOLS.putName("StackMapTable");
         public static final Symbol<Name> Synthetic = SYMBOLS.putName("Synthetic");
         public static final Symbol<Name> clone = SYMBOLS.putName("clone");
+        public static final Symbol<Name> MethodTypeParameterCount = SYMBOLS.putName("MethodTypeParameterCount");
+        public static final Symbol<Name> ClassTypeParameterCount = SYMBOLS.putName("ClassTypeParameterCount");
+        public static final Symbol<Name> InstructionTypeArguments = SYMBOLS.putName("InstructionTypeArguments");
+        public static final Symbol<Name> MethodParameterType = SYMBOLS.putName("MethodParameterType");
+        public static final Symbol<Name> InvokeReturnType = SYMBOLS.putName("InvokeReturnType");
+        public static final Symbol<Name> MethodReturnType = SYMBOLS.putName("MethodReturnType");
+        public static final Symbol<Name> FieldType = SYMBOLS.putName("FieldType");
+
 
         public static void ensureInitialized() {
             /* nop */

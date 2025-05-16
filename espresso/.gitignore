@@ -396,3 +396,7 @@ jmh_result.json
 compile_commands.json
 
 # End of https://www.gitignore.io/api/c,java,python,eclipse,intellij+iml
+
+# build & run scripts
+start.sh
+runEspresso.sh
