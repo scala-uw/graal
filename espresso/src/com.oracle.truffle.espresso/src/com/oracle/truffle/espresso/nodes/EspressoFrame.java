@@ -327,8 +327,12 @@ public final class EspressoFrame {
         return encodedBCI - 1;
     }
 
-    public static int startingStackOffset(int maxLocals) {
+    public static int startingReifiedTypesOffset(int maxLocals) {
         return VALUES_START + maxLocals;
+    }
+
+    public static int startingStackOffset(int maxLocals, int reifiedTypesCnt) {
+        return VALUES_START + maxLocals + reifiedTypesCnt;
     }
 
     public static StaticObject peekReceiver(VirtualFrame frame, int top, Method m) {
@@ -342,17 +346,22 @@ public final class EspressoFrame {
     }
 
     @ExplodeLoop
-    public static Object[] popArguments(VirtualFrame frame, int top, boolean hasReceiver, final Symbol<Type>[] signature) {
+    public static Object[] popArguments(VirtualFrame frame, int top, boolean hasReceiver, final Symbol<Type>[] signature, int typeParamsCnt) {
         int argCount = SignatureSymbols.parameterCount(signature);
 
         int extraParam = hasReceiver ? 1 : 0;
-        final Object[] args = new Object[argCount + extraParam];
+        final Object[] args = new Object[argCount + extraParam + typeParamsCnt];
 
         CompilerAsserts.partialEvaluationConstant(argCount);
         CompilerAsserts.partialEvaluationConstant(signature);
         CompilerAsserts.partialEvaluationConstant(hasReceiver);
+        CompilerAsserts.partialEvaluationConstant(typeParamsCnt);
 
         int argAt = top - 1;
+        for (int i = typeParamsCnt - 1; i >= 0; --i) {
+            args[argCount + extraParam + i] = (byte) popInt(frame, argAt);
+            --argAt;
+        }
         for (int i = argCount - 1; i >= 0; --i) {
             Symbol<Type> argType = SignatureSymbols.parameterType(signature, i);
             // @formatter:off

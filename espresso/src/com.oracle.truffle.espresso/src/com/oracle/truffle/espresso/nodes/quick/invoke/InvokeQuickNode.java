@@ -72,11 +72,12 @@ public abstract class InvokeQuickNode extends QuickNode {
          * Method signature does not change across methods. Can safely use the constant signature
          * from `method` instead of the non-constant signature from the lookup.
          */
-        if (method.isStatic() && method.getMethod().getParameterCount() == 0) {
+        int typeParamsCnt = 0; // Placeholder
+        if (method.isStatic() && method.getMethod().getParameterCount() == 0 && typeParamsCnt == 0) {
             // Don't create an array for empty arguments.
             return EMPTY_ARGS;
         }
-        return EspressoFrame.popArguments(frame, top, !method.isStatic(), method.getMethod().getParsedSignature());
+        return EspressoFrame.popArguments(frame, top, !method.isStatic(), method.getMethod().getParsedSignature(), typeParamsCnt);
     }
 
     public final int pushResult(VirtualFrame frame, int result) {
