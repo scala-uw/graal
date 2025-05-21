@@ -348,7 +348,9 @@ public final class FrameAnalysis implements StackMapFrameParser.FrameBuilder<Bui
         assert Bytecodes.isInvoke(opcode);
         int top = state.top();
         handleInvoke(state, targetBci, opcode, false, opcode == INVOKEDYNAMIC ? ConstantPool.Tag.INVOKEDYNAMIC : ConstantPool.Tag.METHOD_REF);
-        return state.build(EspressoFrame.startingStackOffset(m.getMaxLocals(), 0) + top); // Placeholder
+        MethodTypeParameterCountAttribute attr = m.getMethodTypeParameterCountAttribute();
+        int typeParamCnt = attr != null ? attr.getCount() : 0;
+        return state.build(EspressoFrame.startingStackOffset(m.getMaxLocals(), typeParamCnt) + top); // Placeholder
     }
 
     private void markBranchTargets() {
