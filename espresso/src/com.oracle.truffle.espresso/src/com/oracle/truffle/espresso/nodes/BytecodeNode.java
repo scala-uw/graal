@@ -63,11 +63,16 @@ import com.oracle.truffle.espresso.classfile.ExceptionHandler;
 import com.oracle.truffle.espresso.classfile.JavaKind;
 import com.oracle.truffle.espresso.classfile.attributes.BootstrapMethodsAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.LineNumberTableAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.InstructionTypeArgumentsAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.InvokeReturnTypeAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.MethodParameterTypeAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.MethodReturnTypeAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.MethodTypeParameterCountAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.classfile.bytecode.BytecodeLookupSwitch;
 import com.oracle.truffle.espresso.classfile.bytecode.BytecodeStream;
 import com.oracle.truffle.espresso.classfile.bytecode.BytecodeTableSwitch;
 import com.oracle.truffle.espresso.classfile.bytecode.Bytecodes;
-import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.*;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.AALOAD;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.AASTORE;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ACONST_NULL;
@@ -168,6 +173,142 @@ import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IASTORE;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ICONST_0;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ICONST_1;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ICONST_2;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ICONST_3;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ICONST_4;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ICONST_5;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ICONST_M1;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IDIV;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IFEQ;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IFGE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IFGT;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IFLE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IFLT;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IFNE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IFNONNULL;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IFNULL;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IF_ACMPEQ;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IF_ACMPNE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IF_ICMPEQ;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IF_ICMPGE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IF_ICMPGT;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IF_ICMPLE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IF_ICMPLT;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IF_ICMPNE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IINC;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ILOAD;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ILOAD_0;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ILOAD_1;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ILOAD_2;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ILOAD_3;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IMUL;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INEG;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INSTANCEOF;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKEDYNAMIC;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKEINTERFACE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKESPECIAL;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKESTATIC;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKEVIRTUAL;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IOR;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IREM;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IRETURN;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ISHL;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ISHR;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ISTORE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ISTORE_0;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ISTORE_1;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ISTORE_2;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ISTORE_3;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ISUB;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IUSHR;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.IXOR;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.JSR;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.JSR_W;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.L2D;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.L2F;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.L2I;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LADD;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LALOAD;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LAND;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LASTORE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LCMP;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LCONST_0;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LCONST_1;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LDC;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LDC2_W;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LDC_W;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LDIV;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LLOAD;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LLOAD_0;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LLOAD_1;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LLOAD_2;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LLOAD_3;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LMUL;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LNEG;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LOOKUPSWITCH;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LOR;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LREM;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LRETURN;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LSHL;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LSHR;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LSTORE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LSTORE_0;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LSTORE_1;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LSTORE_2;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LSTORE_3;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LSUB;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LUSHR;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.LXOR;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.MONITORENTER;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.MONITOREXIT;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.MULTIANEWARRAY;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.NEW;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.NEWARRAY;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.NOP;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.POP;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.POP2;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.PUTFIELD;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.PUTSTATIC;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.QUICK;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.RET;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.RETURN;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.RETURN_VALUE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.SALOAD;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.SASTORE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.SIPUSH;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.SLIM_QUICK;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.SWAP;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.TABLESWITCH;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.THROW_VALUE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.WIDE;
+import com.oracle.truffle.espresso.classfile.bytecode.VolatileArrayAccess;
+import com.oracle.truffle.espresso.classfile.constantpool.ClassConstant;
+import com.oracle.truffle.espresso.classfile.constantpool.DoubleConstant;
+import com.oracle.truffle.espresso.classfile.constantpool.DynamicConstant;
+import com.oracle.truffle.espresso.classfile.constantpool.FloatConstant;
+import com.oracle.truffle.espresso.classfile.constantpool.IntegerConstant;
+import com.oracle.truffle.espresso.classfile.constantpool.LongConstant;
+import com.oracle.truffle.espresso.classfile.constantpool.MethodHandleConstant;
+import com.oracle.truffle.espresso.classfile.constantpool.MethodRefConstant;
+import com.oracle.truffle.espresso.classfile.constantpool.MethodTypeConstant;
+import com.oracle.truffle.espresso.classfile.constantpool.PoolConstant;
+import com.oracle.truffle.espresso.classfile.constantpool.Resolvable;
+import com.oracle.truffle.espresso.classfile.constantpool.StringConstant;
+import com.oracle.truffle.espresso.classfile.descriptors.SignatureSymbols;
+import com.oracle.truffle.espresso.classfile.descriptors.Symbol;
+import com.oracle.truffle.espresso.classfile.descriptors.Type;
+import com.oracle.truffle.espresso.classfile.perf.DebugCounter;
+import com.oracle.truffle.espresso.constantpool.Resolution;
+import com.oracle.truffle.espresso.constantpool.ResolvedDynamicConstant;
+import com.oracle.truffle.espresso.constantpool.ResolvedWithInvokerClassMethodRefConstant;
+import com.oracle.truffle.espresso.constantpool.RuntimeConstantPool;
+import com.oracle.truffle.espresso.impl.ArrayKlass;
+import com.oracle.truffle.espresso.impl.Field;
+import com.oracle.truffle.espresso.impl.Klass;
+import com.oracle.truffle.espresso.impl.Method;
+import com.oracle.truffle.espresso.impl.Method.MethodVersion;
+import com.oracle.truffle.espresso.impl.ObjectKlass;
+import com.oracle.truffle.espresso.meta.EspressoError;
+import com.oracle.truffle.espresso.meta.Meta;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.clear;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.createFrameDescriptor;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.dup1;
@@ -335,6 +476,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     private final int throwValueBci;
 
     private final int reifiedTypesCnt;
+    private final TypeHints.TypeA[][] instructionTypeArgHints;
 
     public BytecodeNode(MethodVersion methodVersion) {
         CompilerAsserts.neverPartOfCompilation();
@@ -360,7 +502,13 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         ? TRIVIAL_UNINITIALIZED
                         : TRIVIAL_NO;
 
-        this.reifiedTypesCnt = 0; // Placeholder
+        MethodTypeParameterCountAttribute typeParamCntAttr = methodVersion.getMethod().getMethodTypeParameterCountAttribute();
+        this.reifiedTypesCnt = typeParamCntAttr != null ? typeParamCntAttr.getCount() : 0;
+        this.instructionTypeArgHints = new TypeHints.TypeA[this.bs.endBCI()][];
+        InstructionTypeArgumentsAttribute instTypeArgAttr = methodVersion.getMethod().getInstructionTypeArgumentsAttribute();
+        for (InstructionTypeArgumentsAttribute.Entry entry : instTypeArgAttr.getEntries()) {
+            this.instructionTypeArgHints[entry.getBytecodeOffset()] = entry.getTypeArguments();
+        }
     }
 
     public FrameDescriptor getFrameDescriptor() {
@@ -686,6 +834,21 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     setBCI(frame, curBCI);
                 }
 
+                if (instructionTypeArgHints[curBCI] != null) {
+                    CompilerAsserts.partialEvaluationConstant(instructionTypeArgHints[curBCI].length);
+                    for (TypeHints.TypeA typeArg : instructionTypeArgHints[curBCI]) {
+                        byte kind = typeArg.getKind();
+                        CompilerAsserts.partialEvaluationConstant(kind);
+                        if (kind == TypeHints.TypeA.METHOD_TYPE_PARAM) {
+                            putInt(frame, top, getReifiedTypeAt(frame, startingReifiedTypesOffset(methodVersion.getMaxLocals()), typeArg.getIndex()));
+                        } else if (kind == TypeHints.TypeA.CLASS_TYPE_PARAM) {
+                            // TODO
+                        } else {
+                            putInt(frame, top, kind);
+                        }
+                        ++top;
+                    }
+                }
                 // @formatter:off
                 switch (curOpcode) {
                     case NOP: break;
@@ -1227,8 +1390,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     case INVOKESPECIAL: // fall through
                     case INVOKESTATIC:  // fall through
                     case INVOKEINTERFACE:
-                        // TODO: push type arguments into the operand stack
-                        int typeArgsCnt = 0; // Placeholder
                         top += quickenInvoke(frame, top, curBCI, curOpcode, statementIndex); break;
 
                     case NEW         :
