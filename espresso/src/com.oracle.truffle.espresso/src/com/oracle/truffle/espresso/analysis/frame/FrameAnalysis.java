@@ -22,6 +22,24 @@
  */
 package com.oracle.truffle.espresso.analysis.frame;
 
+import java.util.ArrayDeque;
+import java.util.BitSet;
+import java.util.function.Function;
+
+import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
+import com.oracle.truffle.espresso.EspressoLanguage;
+import com.oracle.truffle.espresso.analysis.frame.EspressoFrameDescriptor.Builder;
+import com.oracle.truffle.espresso.analysis.liveness.LivenessAnalysis;
+import com.oracle.truffle.espresso.classfile.ClassfileParser;
+import com.oracle.truffle.espresso.classfile.ConstantPool;
+import com.oracle.truffle.espresso.classfile.Constants;
+import com.oracle.truffle.espresso.classfile.ExceptionHandler;
+import com.oracle.truffle.espresso.classfile.JavaKind;
+import com.oracle.truffle.espresso.classfile.attributes.StackMapTableAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.MethodTypeParameterCountAttribute;
+import com.oracle.truffle.espresso.classfile.bytecode.BytecodeStream;
+import com.oracle.truffle.espresso.classfile.bytecode.BytecodeSwitch;
+import com.oracle.truffle.espresso.classfile.bytecode.Bytecodes;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.AALOAD;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.AASTORE;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ACONST_NULL;
@@ -223,24 +241,6 @@ import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.SASTORE;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.SIPUSH;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.SWAP;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.TABLESWITCH;
-
-import java.util.ArrayDeque;
-import java.util.BitSet;
-import java.util.function.Function;
-
-import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
-import com.oracle.truffle.espresso.EspressoLanguage;
-import com.oracle.truffle.espresso.analysis.frame.EspressoFrameDescriptor.Builder;
-import com.oracle.truffle.espresso.analysis.liveness.LivenessAnalysis;
-import com.oracle.truffle.espresso.classfile.ClassfileParser;
-import com.oracle.truffle.espresso.classfile.ConstantPool;
-import com.oracle.truffle.espresso.classfile.Constants;
-import com.oracle.truffle.espresso.classfile.ExceptionHandler;
-import com.oracle.truffle.espresso.classfile.JavaKind;
-import com.oracle.truffle.espresso.classfile.attributes.StackMapTableAttribute;
-import com.oracle.truffle.espresso.classfile.bytecode.BytecodeStream;
-import com.oracle.truffle.espresso.classfile.bytecode.BytecodeSwitch;
-import com.oracle.truffle.espresso.classfile.bytecode.Bytecodes;
 import com.oracle.truffle.espresso.classfile.constantpool.DynamicConstant;
 import com.oracle.truffle.espresso.classfile.descriptors.SignatureSymbols;
 import com.oracle.truffle.espresso.classfile.descriptors.Symbol;
@@ -348,7 +348,7 @@ public final class FrameAnalysis implements StackMapFrameParser.FrameBuilder<Bui
         assert Bytecodes.isInvoke(opcode);
         int top = state.top();
         handleInvoke(state, targetBci, opcode, false, opcode == INVOKEDYNAMIC ? ConstantPool.Tag.INVOKEDYNAMIC : ConstantPool.Tag.METHOD_REF);
-        MethodTypeParameterCountAttribute attr = m.getMethodTypeParameterCountAttribute();
+        MethodTypeParameterCountAttribute attr = m.getMethod().getMethodTypeParameterCountAttribute();
         int typeParamCnt = attr != null ? attr.getCount() : 0;
         return state.build(EspressoFrame.startingStackOffset(m.getMaxLocals(), typeParamCnt) + top); // Placeholder
     }
