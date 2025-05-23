@@ -60,7 +60,7 @@ visualizer/IdealGraphVisualizer/*/target/
 *.interp
 *.tokens
 /vm/tests/gh_workflows/CDTInspectorTest/target/
-!classfiles/modified/bcGen/*.class
-!classfiles/scala/bcGen/*.class
+!tests/classfiles/hint/bcGen/*.class
+!tests/classfiles/plain/bcGen/*.class
 .vscode/
 .metals/
