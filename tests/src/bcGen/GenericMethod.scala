@@ -4,7 +4,7 @@ class GenericMethod {
   // non-generic method, no type hint
   def passInt(x: Int): Int = x
   // non-generic method, no type hint
-  def passRef(x: ClassRef): ClassRef = x
+  def passRef(x: Foo): Foo = x
   // @MethodTypeParameterCount: 1
   // @MethodParameterType: M0
   // @MethodReturnType: M0
@@ -25,14 +25,14 @@ object testGenericMethod {
        23
        2.2
        c
-       Printing ClassRef 1
-       Printing ClassRef 2
+       Printing Foo 1
+       Printing Foo 2
        8
        87
        88
     */
     test1()
-    println("test2[Int, Char, Double]:")
+    println("test2[Int, Char, Double]\nU, X, Y: Int, Char, Double\nvalue: 7; fst: 'v'; snd: 9.9")
     /* prints:
        9.9
        7
@@ -41,15 +41,15 @@ object testGenericMethod {
        7
      */
     test2[Int, Char, Double](7, 'v', 9.9)
-    println("test2[ClassRef, ClassRef, ClassRef")
+    println("test2[Foo, Foo, Foo]\nU, X, Y:Foo, Foo, Foo\nvalue: new Foo(-1); fst: new Foo(-2); snd: new Foo(-3)")
     /* prints:
-       Printing ClassRef -3
-       Printing ClassRef -1
-       Printing ClassRef -1
-       Printing ClassRef -2
-       Printing ClassRef -1
+       Printing Foo -3
+       Printing Foo -1
+       Printing Foo -1
+       Printing Foo -2
+       Printing Foo -1
      */
-    test2[ClassRef, ClassRef, ClassRef](new ClassRef(-1), new ClassRef(-2), new ClassRef(-3))
+    test2[Foo, Foo, Foo](new Foo(-1), new Foo(-2), new Foo(-3))
   }
   //if (methodParameterTpye is generic (has generic methodParameterType type hint) &&
   //    reified type is primitive &&
@@ -63,45 +63,53 @@ object testGenericMethod {
     // type argument to a generic method
     // @InstructionTypeArguments: offset, I
     // @InvokeReturnType: offset, L (?TBD)
+    println("identity[Int](23)")
     val v1 = gm.identity[Int](23) //need InstructionTypeArg: I, InvokeReturnType: L (boxing needed in case INVOKE)
     println(v1)
     // passing to a non-generic method
     // with java.lang.Object as parameter
     // no hints needed
+    println("identity2(2.2)")
     val v2 = gm.identity2(2.2)
     println(v2)
     // passing two different primitive types 
     // as type arguments to a generic method
     // @InstructionTypeArguments: offset, C D
     // @InvokeReturnType: offset, L (?TBD)
+    println("first[Char, Double]('c', 8.8)")
     val v3 = gm.first[Char, Double]('c', 8.8) //same as v1, need InstructionTypeArg: CD, InvokeReturnType: L (boxing needed)
     println(v3)
     // passing a scala class as
     // type argument to a generic method
     // @InstructionTypeArguments: offset, L
     // @InvokeReturnType: offset, L
-    val v4 = gm.identity[ClassRef](new ClassRef(1)) //need InstructionTypeArg: L, InvokeReturnType: L (no boxing needed)
+    println("identity[Foo](new Foo(1))")
+    val v4 = gm.identity[Foo](new Foo(1)) //need InstructionTypeArg: L, InvokeReturnType: L (no boxing needed)
     println(v4)
     // passing a scala class to a method
-    // that takes ClassRef as parameter
+    // that takes Foo as parameter
     // no hints needed
-    val v5 = gm.passRef(new ClassRef(2))
+    println("passRef(new Foo(2))")
+    val v5 = gm.passRef(new Foo(2))
     println(v5)
     // passing a java class as
     // type argument to a generic method
     // @InstructionTypeArguments: offset, L
     // @InvokeReturnType: offset, L
+    println("identity[java.lang.Integer](java.lang.Integer.valueOf(8))")
     val v6 = gm.identity[java.lang.Integer](java.lang.Integer.valueOf(8))
     println(v6)
     // passing a java class to a 
     // non-generic method
     // with java.lang.Object as parameter
     // no hints needed
+    println("identity2(java.lang.Integer.valueOf(87))")
     val v7 = gm.identity2(java.lang.Integer.valueOf(87))
     println(v7)
     // passing a scala int to a
     // non-generic method
     // no hints needed
+    println("passInt(88)")
     val v8 = gm.passInt(88)
     println(v8)
   }
@@ -113,11 +121,13 @@ object testGenericMethod {
     // of that type to a generic method
     // @InstructionTypeArguments: offset, M2
     // @InvokeReturnType: offset, M2
+    println("identity[Y](snd)")
     val v1 = gm.identity[Y](snd) //need InstructionTypeArg: M2, InvokeReturnType: M2?
     println(v1)
     // passing a value of generic type
     // to a non-generic method
     // no hints needed
+    println("identity2(value)")
     val v2 = gm.identity2(value)
     println(v2)
     // passing a value of generic type
@@ -125,12 +135,14 @@ object testGenericMethod {
     // type parameter Any(java.lang.Object)
     // @InstructionTypeArguments: offset, L
     // @InvokeReturnType: offset, L
+    println("identity[Any](value)")
     val v3 = gm.identity[Any](value)
     println(v3)
     // passing two values of generic types
     // to a generic method
     // @InstructionTypeArguments: offset, M1 M2
     // @InvokeReturnType: offset, M1
+    println("first[X, Y](fst, snd)")
     val v4 = gm.first[X, Y](fst, snd)
     println(v4)
     // passing two values, one a scala class
@@ -138,6 +150,7 @@ object testGenericMethod {
     // to a generic method
     // @InstructionTypeArguments: offset, L M2
     // @InvokeReturnType: offset, L
+    println("first[Any, Y](value, snd)")
     val v5 = gm.first[Any, Y](value, snd)
     println(v5)
   }

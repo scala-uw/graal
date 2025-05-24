@@ -64,3 +64,5 @@ visualizer/IdealGraphVisualizer/*/target/
 !tests/classfiles/plain/bcGen/*.class
 .vscode/
 .metals/
+.scala-build/
+.bsp/
