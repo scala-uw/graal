@@ -1,5 +1,7 @@
 package com.oracle.truffle.espresso.classfile.attributes.reified;
 
+import java.util.Objects;
+
 public class TypeHints {
     public static class TypeA {
         public static final byte BYTE = 'B';
@@ -50,6 +52,20 @@ public class TypeHints {
         }
 
         @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof TypeA)) {
+                return false;
+            }
+            TypeA other = (TypeA) obj;
+            return this.kind == other.kind && this.index == other.index;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(kind, index);
+        }
+
+        @Override
         public String toString() {
             return "TypeA{" +
                             "kind=" + (char) kind +
@@ -93,6 +109,20 @@ public class TypeHints {
 
         public boolean isNoHint() {
             return this == NO_HINT || (this.kind == 0 && this.index == -1);
+        }
+
+        @Override
+        public boolean equals(Object obj){
+            if (!(obj instanceof TypeB)) {
+                return false;
+            }
+            TypeB other = (TypeB) obj;
+            return this.kind == other.kind && this.index == other.index;
+        }
+
+        @Override
+        public int hashCode(){
+            return Objects.hash(kind, index);
         }
 
         @Override

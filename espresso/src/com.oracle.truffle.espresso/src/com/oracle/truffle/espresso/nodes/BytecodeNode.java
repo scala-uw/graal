@@ -58,6 +58,7 @@ import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.espresso.EspressoLanguage;
 import com.oracle.truffle.espresso.analysis.liveness.LivenessAnalysis;
+import com.oracle.truffle.espresso.analysis.typehints.TypeHintAnalysis;
 import com.oracle.truffle.espresso.bytecode.MapperBCI;
 import com.oracle.truffle.espresso.classfile.ExceptionHandler;
 import com.oracle.truffle.espresso.classfile.JavaKind;
@@ -478,6 +479,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     private final int reifiedTypesCnt;
     private final TypeHints.TypeA[][] instructionTypeArgHints;
 
+    private final TypeHintAnalysis typeHintAnalysis = null;
+
     public BytecodeNode(MethodVersion methodVersion) {
         CompilerAsserts.neverPartOfCompilation();
         Method method = methodVersion.getMethod();
@@ -501,6 +504,10 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 this.instructionTypeArgHints[entry.getBytecodeOffset()] = entry.getTypeArguments();
                 maxExtraStack = Math.max(maxExtraStack, entry.getTypeArguments().length);
             }
+        }
+
+        if (this.reifiedTypesCnt > 0){
+            TypeHintAnalysis.analyze(methodVersion);
         }
 
         this.frameDescriptor = createFrameDescriptor(methodVersion.getMaxLocals() + this.reifiedTypesCnt, methodVersion.getMaxStackSize() + maxExtraStack);
