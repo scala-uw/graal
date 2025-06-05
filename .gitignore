@@ -66,3 +66,4 @@ visualizer/IdealGraphVisualizer/*/target/
 .metals/
 .scala-build/
 .bsp/
+/substratevm/src/native-image-module-tests/*/target/
