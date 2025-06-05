@@ -58,7 +58,7 @@ import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.espresso.EspressoLanguage;
 import com.oracle.truffle.espresso.analysis.liveness.LivenessAnalysis;
-import com.oracle.truffle.espresso.analysis.typehints.TypeAnalysisResult;
+import com.oracle.truffle.espresso.analysis.typehints.TypeAnalysisState;
 import com.oracle.truffle.espresso.analysis.typehints.TypeHintAnalysis;
 import com.oracle.truffle.espresso.bytecode.MapperBCI;
 import com.oracle.truffle.espresso.classfile.ExceptionHandler;
@@ -507,7 +507,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             }
         }
 
-        this.typeAnalysisRes = this.reifiedTypesCnt > 0 ? TypeHintAnalysis.analyze(methodVersion).getResAtBCI() : null;
+        this.typeAnalysisRes = this.reifiedTypesCnt > 0 ? TypeHintAnalysis.analyze(methodVersion).getRes() : null;
 
         this.frameDescriptor = createFrameDescriptor(methodVersion.getMaxLocals() + this.reifiedTypesCnt, methodVersion.getMaxStackSize() + maxExtraStack);
         this.noForeignObjects = Truffle.getRuntime().createAssumption("noForeignObjects");

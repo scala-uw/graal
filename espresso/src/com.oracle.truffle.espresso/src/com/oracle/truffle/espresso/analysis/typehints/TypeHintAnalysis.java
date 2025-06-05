@@ -31,13 +31,13 @@ public class TypeHintAnalysis {
     }
 
     @CompilationFinal(dimensions = 1)
-    private final TypeAnalysisResult[] resAtBCI;
+    private final TypeAnalysisState[] resAtBCI;
 
-    private TypeHintAnalysis(TypeAnalysisResult[] resAtBCI) {
+    private TypeHintAnalysis(TypeAnalysisState[] resAtBCI) {
         this.resAtBCI = resAtBCI;
     }
 
-    public TypeAnalysisResult[] getResAtBCI() {
+    public TypeAnalysisState[] getResAtBCI() {
         return resAtBCI;
     }
 
