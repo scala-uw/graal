@@ -29,9 +29,9 @@ public class TypeAnalysisResult {
         }
     }
 
-    TypeInfo[] locals;
-    TypeInfo[] stack;
-    int stackTop; 
+    final TypeInfo[] locals;
+    final TypeInfo[] stack;
+    final int stackTop; 
     //stackTop points to the next position in the stack
     // init to 0
 
@@ -41,16 +41,20 @@ public class TypeAnalysisResult {
         this.stackTop = 0;
     }
 
+    public TypeAnalysisResult(TypeAnalysisResult y) {
+        this.locals = new TypeInfo[y.locals.length];
+        this.stack = new TypeInfo[y.stack.length];
+        for (int i = 0; i < y.locals.length; i++) {
+            this.locals[i] = y.locals[i];
+        }
+        for (int i = 0; i < y.stack.length; i++) {
+            this.stack[i] = y.stack[i];
+        }
+        this.stackTop = y.stackTop;
+    }
+
     public TypeAnalysisResult copy() {
-        TypeAnalysisResult copy = new TypeAnalysisResult(locals.length, stack.length);
-        for (int i = 0; i < locals.length; i++) {
-            copy.locals[i] = locals[i] != null ? locals[i].copy() : null;
-        }
-        for (int i = 0; i < stack.length; i++) {
-            copy.stack[i] = stack[i] != null ? stack[i].copy() : null;
-        }
-        copy.stackTop = this.stackTop;
-        return copy;
+        return new TypeAnalysisResult(this);
     }
 
     public static TypeAnalysisResult merge(List<TypeAnalysisResult> states, int maxLocals, int maxStack){
