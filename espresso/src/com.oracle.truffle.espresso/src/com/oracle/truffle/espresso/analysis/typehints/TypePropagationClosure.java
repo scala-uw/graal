@@ -3,7 +3,6 @@ package com.oracle.truffle.espresso.analysis.typehints;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.espresso.analysis.AnalysisProcessor;
 import com.oracle.truffle.espresso.analysis.BlockIterator;
 import com.oracle.truffle.espresso.analysis.BlockIteratorClosure;
@@ -13,28 +12,27 @@ import com.oracle.truffle.espresso.classfile.attributes.reified.MethodParameterT
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodReturnTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.classfile.bytecode.BytecodeStream;
-import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ALOAD;
-import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ASTORE;
-import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.DUP;
-import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKEINTERFACE;
-import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKESPECIAL;
-import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKESTATIC;
-import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKEVIRTUAL;
-import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.SWAP;
-
 import com.oracle.truffle.espresso.classfile.bytecode.Bytecodes;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ALOAD;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ALOAD_0;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ALOAD_1;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ALOAD_2;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ALOAD_3;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ASTORE;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ASTORE_0;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ASTORE_1;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ASTORE_2;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ASTORE_3;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.DUP;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.GETFIELD;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.GETSTATIC;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKEINTERFACE;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKESPECIAL;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKESTATIC;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKEVIRTUAL;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.PUTFIELD;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.PUTSTATIC;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.SWAP;
 import com.oracle.truffle.espresso.classfile.constantpool.MethodRefConstant;
 import com.oracle.truffle.espresso.classfile.constantpool.Resolvable;
 import com.oracle.truffle.espresso.constantpool.Resolution;
@@ -237,53 +235,21 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     if (invokedMethodReturnTypeAttribute != null){
                         System.out.println("Invoked method return type: " + invokedMethodReturnTypeAttribute.getReturnType());
                         TypeHints.TypeB returnType = invokedMethodReturnTypeAttribute.getReturnType();
-                        int index = returnType.getIndex();
-                        byte kind = returnType.getKind();
-                        //the return type of the invoked method is known
-                        if (kind == TypeHints.TypeB.M_KIND){
-                            //return type is M(n), n-th type parameter of the invoked method,
-                            //so we need the InstructionTypeArgumentsAttribute of the current method
-                            InstructionTypeArgumentsAttribute instructionTypeArgumentsAttribute = 
-                                getMethod().getInstructionTypeArgumentsAttribute();
-                            if (instructionTypeArgumentsAttribute == null){
-                                throw new AssertionError("Method " + getMethod().getName() + " does not have instruction type arguments attribute");
-                            }
-                            InstructionTypeArgumentsAttribute.Entry[] entries = instructionTypeArgumentsAttribute.getEntries();
-                            boolean found = false;
-                            TypeHints.TypeB typeB = null;
-                            for (InstructionTypeArgumentsAttribute.Entry entry : entries){
-                                if (entry.getBytecodeOffset() == bci) {
-                                    found = true;
-                                    TypeHints.TypeA[] typeArguments = entry.getTypeArguments();
-                                    if (index < typeArguments.length){
-                                        TypeHints.TypeA typeA = typeArguments[index];
-                                        if (typeA.getKind() == TypeHints.TypeA.METHOD_TYPE_PARAM){
-                                            int typeAIndex = typeA.getIndex();
-                                            typeB = new TypeHints.TypeB( //compute the resulting typeB from it
-                                                TypeHints.TypeB.M_KIND, typeAIndex);
-                                        } else if (typeA.getKind() == TypeHints.TypeA.CLASS_TYPE_PARAM) {
-                                            //TODO
-                                        } else {
-                                            //TODO
-                                        }
-                                        for (int i = 0; i < returnValueSlotCount; i++){
-                                            state.stack[state.stackTop++] = 
-                                                typeB == null ? null : new TypeAnalysisResult.TypeInfo(typeB);
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
-                            if (!found) {
-                                throw new AssertionError("Method " + getMethod().getName() + " does not have correct instruction type arguments for bci: " + bci);
-                            }
-                        } else if (kind == TypeHints.TypeB.K_KIND) {
-                            //TODO
-                        } else if (kind == TypeHints.TypeB.ARR_K_KIND) {
-                            //TODO
-                        } else if (kind == TypeHints.TypeB.ARR_M_KIND) {
-                            //TODO
+                        // int index = returnType.getIndex();
+                        // byte kind = returnType.getKind();
+                        for (int i = 0; i < returnValueSlotCount; i++){
+                            state.stack[state.stackTop++] = returnType.isNoHint() ? null : new TypeAnalysisResult.TypeInfo(returnType);
                         }
+                        // //the return type of the invoked method is known
+                        // if (kind == TypeHints.TypeB.M_KIND){
+                        //    TypeHints.TypeB retTypeB = new TypeB()
+                        // } else if (kind == TypeHints.TypeB.K_KIND) {
+                        //     //TODO
+                        // } else if (kind == TypeHints.TypeB.ARR_K_KIND) {
+                        //     //TODO
+                        // } else if (kind == TypeHints.TypeB.ARR_M_KIND) {
+                        //     //TODO
+                        // }
                     } else {
                         //no type hints for the return value
                         for (int i = 0; i < returnValueSlotCount; i++){

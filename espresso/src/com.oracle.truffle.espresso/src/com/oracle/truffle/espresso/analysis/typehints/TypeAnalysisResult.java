@@ -29,9 +29,9 @@ public class TypeAnalysisResult {
         }
     }
 
-    final TypeInfo[] locals;
-    final TypeInfo[] stack;
-    final int stackTop; 
+    TypeInfo[] locals;
+    TypeInfo[] stack;
+    int stackTop; 
     //stackTop points to the next position in the stack
     // init to 0
 
