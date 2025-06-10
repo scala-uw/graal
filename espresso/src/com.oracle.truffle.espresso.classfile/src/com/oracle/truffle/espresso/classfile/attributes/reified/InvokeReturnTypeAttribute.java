@@ -3,7 +3,6 @@ package com.oracle.truffle.espresso.classfile.attributes.reified;
 import java.util.Arrays;
 
 import com.oracle.truffle.espresso.classfile.attributes.Attribute;
-import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints.TypeA;
 import com.oracle.truffle.espresso.classfile.descriptors.Name;
 import com.oracle.truffle.espresso.classfile.descriptors.ParserSymbols.ParserNames;
 import com.oracle.truffle.espresso.classfile.descriptors.Symbol;
@@ -16,15 +15,15 @@ public class InvokeReturnTypeAttribute extends Attribute {
     public static final class Entry {
         public static final Entry[] EMPTY_ARRAY = new Entry[0];
         private final int bytecodeOffset;
-        private final TypeA returnType;
-        public Entry(int bytecodeOffset, TypeA returnType) {
+        private final TypeHints.TypeB returnType;
+        public Entry(int bytecodeOffset, TypeHints.TypeB returnType) {
             this.bytecodeOffset = bytecodeOffset;
             this.returnType = returnType;
         }
         public int getBytecodeOffset() {
             return bytecodeOffset;
         }
-        public TypeA getReturnType() {
+        public TypeHints.TypeB getReturnType() {
             return returnType;
         }
         @Override

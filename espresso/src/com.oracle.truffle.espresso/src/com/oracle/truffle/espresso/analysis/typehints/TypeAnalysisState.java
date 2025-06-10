@@ -5,24 +5,23 @@ import java.util.List;
 import java.util.Objects;
 
 import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
-import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints.TypeB;
 
 public class TypeAnalysisState {
-    TypeB[] locals;
-    TypeB[] stack;
+    TypeHints.TypeB[] locals;
+    TypeHints.TypeB[] stack;
     int stackTop; 
     //stackTop points to the next position in the stack
     // init to 0
 
     public TypeAnalysisState(int maxLocals, int maxStack) {
-        this.locals = new TypeB[maxLocals];
-        this.stack = new TypeB[maxStack];
+        this.locals = new TypeHints.TypeB[maxLocals];
+        this.stack = new TypeHints.TypeB[maxStack];
         this.stackTop = 0;
     }
 
     public TypeAnalysisState(TypeAnalysisState y) {
-        this.locals = new TypeB[y.locals.length];
-        this.stack = new TypeB[y.stack.length];
+        this.locals = new TypeHints.TypeB[y.locals.length];
+        this.stack = new TypeHints.TypeB[y.stack.length];
         for (int i = 0; i < y.locals.length; i++) {
             this.locals[i] = y.locals[i];
         }
@@ -40,8 +39,8 @@ public class TypeAnalysisState {
         TypeAnalysisState ret = states.get(0).copy();
         for (TypeAnalysisState v : states) {
             assert v.stackTop == ret.stackTop : "stackTop unmatch when merging control flows";
-            assert Array.equals(ret.locals, v.locals) : "locals unmatch when merging control flows";
-            assert Array.equals(ret.stack, v.stack) : "stack unmatch when merging control flows";
+            assert Arrays.equals(ret.locals, v.locals) : "locals unmatch when merging control flows";
+            assert Arrays.equals(ret.stack, v.stack) : "stack unmatch when merging control flows";
         }
         return ret;
     }
@@ -51,7 +50,7 @@ public class TypeAnalysisState {
         StringBuilder sb = new StringBuilder();
         sb.append("TypeAnalysisResult{");
         sb.append("locals=[");
-        for (TypeB local : locals) {
+        for (TypeHints.TypeB local : locals) {
             sb.append(local != null ? local.toString() : "null").append(", ");
         }
         sb.append("], stack=[");

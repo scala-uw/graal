@@ -8,6 +8,7 @@ import com.oracle.truffle.espresso.analysis.BlockIterator;
 import com.oracle.truffle.espresso.analysis.BlockIteratorClosure;
 import com.oracle.truffle.espresso.analysis.graph.LinkedBlock;
 import com.oracle.truffle.espresso.classfile.attributes.reified.InstructionTypeArgumentsAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.InvokeReturnTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodParameterTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodReturnTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
@@ -24,6 +25,8 @@ import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ASTORE_1;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ASTORE_2;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ASTORE_3;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.DUP;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.DUP_X1;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.DUP_X2;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.GETFIELD;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.GETSTATIC;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.INVOKEINTERFACE;
@@ -58,6 +61,9 @@ public class TypePropagationClosure extends BlockIteratorClosure{
     private final Method.MethodVersion methodVersion;
     private final int maxLocals;
     private final int maxStack;
+    private final InvokeReturnTypeAttribute.Entry[] invokeReturnTypeAttributes;
+
+    private final boolean debug = true;
 
     public TypePropagationClosure(
                     EspressoContext ctx,
@@ -72,6 +78,9 @@ public class TypePropagationClosure extends BlockIteratorClosure{
         this.maxLocals = maxLocals;
         this.maxStack = maxStack;
         this.resAtBlockEnd = new TypeAnalysisState[totalBlocks];
+        InvokeReturnTypeAttribute attr = getMethod().getInvokeReturnTypeAttribute();
+        this.invokeReturnTypeAttributes = 
+        (attr == null ? null : attr.getEntries());
     }
 
     @Override
@@ -130,9 +139,9 @@ public class TypePropagationClosure extends BlockIteratorClosure{
         int bci = block.start();
         while (bci <= block.end()){
             int opcode = bs.currentBC(bci);
-            int cpi; int stackEffect;
-            System.out.println("Processing opcode: " + Bytecodes.nameOf(opcode) + " at bci: " + bci);
-            System.out.println("Current state: " + state);
+            int cpi; int stackEffect; TypeHints.TypeB tmp;
+            if (debug) System.out.println("Processing opcode: " + Bytecodes.nameOf(opcode) + " at bci: " + bci);
+            if (debug) System.out.println("Current state: " + state);
             switch (opcode){
                 case ASTORE:
                 case ASTORE_0:
@@ -142,7 +151,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     int astoreIndex = opcode == ASTORE ? bs.readLocalIndex(bci) : (opcode - ASTORE_0);
                     assert state.stackTop > 0;
                     this.resAtBCI[bci] = new TypeAnalysisResult(new TypeHints.TypeB[]{state.stack[state.stackTop - 1]});
-                    System.out.println("Astore index: " + astoreIndex + " stack top: " + state.stack[state.stackTop - 1]);
+                    if (debug) System.out.println("Astore index: " + astoreIndex + " stack top: " + state.stack[state.stackTop - 1]);
                     if (state.stackTop > 0){
                         if (state.stack[state.stackTop - 1] == null){
                             state.locals[astoreIndex] = null;
@@ -163,7 +172,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                 case ALOAD_3:
                     int aloadIndex = opcode == ALOAD ? bs.readLocalIndex(bci) : (opcode - ALOAD_0);
                     this.resAtBCI[bci] = new TypeAnalysisResult(new TypeHints.TypeB[]{state.locals[aloadIndex]});
-                    System.out.println("Aload index: " + aloadIndex + " locals at index: " + state.locals[aloadIndex]);
+                    if (debug) System.out.println("Aload index: " + aloadIndex + " locals at index: " + state.locals[aloadIndex]);
                     if (state.locals[aloadIndex] == null){
                         state.stack[state.stackTop] = null;
                     } else {
@@ -182,7 +191,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     //     getMethod().getContext().getClassRedefinition().check();
                     //     field = getConstantPool().resolveFieldAndUpdate(getMethod().getDeclaringKlass(), cpi, field);
                     // }
-                    System.out.println("Resolved Field: " + field.getName() + " at bci: " + bci);
+                    if (debug) System.out.println("Resolved Field: " + field.getName() + " at bci: " + bci);
                     int fieldSlotCount = field.getKind().getSlotCount();
                     for (int i = 0; i < -Bytecodes.stackEffectOf(opcode); i++) {
                         state.stackTop--;
@@ -248,15 +257,20 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                         --state.stackTop;
                     }
                     
-                    System.out.println("Resolved method: " + resolvedMethod.getName() + " at bci: " + bci 
+                    if (debug) System.out.println("Resolved method: " + resolvedMethod.getName() + " at bci: " + bci 
                         + " with param count: " + paramCnt);
 
                     int returnValueSlotCount = resolvedMethod.getReturnKind().getSlotCount();
 
-                    MethodReturnTypeAttribute invokedMethodReturnTypeAttribute = resolvedMethod.getMethodReturnTypeAttribute();
-                    if (invokedMethodReturnTypeAttribute != null){
-                        System.out.println("Invoked method return type: " + invokedMethodReturnTypeAttribute.getReturnType());
-                        TypeHints.TypeB returnType = invokedMethodReturnTypeAttribute.getReturnType();
+                    TypeHints.TypeB returnType = null;
+                    for (InvokeReturnTypeAttribute.Entry invokeReturnTypeAttribute : invokeReturnTypeAttributes) {
+                        if (invokeReturnTypeAttribute.getBytecodeOffset() == bci) {
+                            returnType = invokeReturnTypeAttribute.getReturnType();
+                            break;
+                        }
+                    }
+                    if (returnType != null){
+                        if (debug) System.out.println("method return type of method " + resolvedMethod.getName() + ": " + returnType);
                         for (int i = 0; i < returnValueSlotCount; i++){
                             state.stack[state.stackTop++] = returnType.isNoHint() ? null : returnType;
                         }
@@ -266,22 +280,31 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                             state.stack[state.stackTop++] = null;
                         }
                     }
-                    InstructionTypeArgumentsAttribute methodTypeArgumentsAttribute = 
-                        getMethod().getInstructionTypeArgumentsAttribute();
-                    if (methodTypeArgumentsAttribute != null) {
-                        //TODO:
-                    } else {
-                        throw new AssertionError("Method " + getMethod().getName() + "does not have type arguments attribute");
-                    }
                     break;
                 case DUP:
                     assert state.stackTop > 0;
                     state.stack[state.stackTop] = state.stack[state.stackTop - 1];
                     state.stackTop++;
                     break;
+                case DUP_X1:
+                    assert state.stackTop > 2;
+                    tmp = state.stack[state.stackTop - 1];
+                    state.stack[state.stackTop] = state.stack[state.stackTop - 1];
+                    state.stack[state.stackTop - 1] = state.stack[state.stackTop - 2];
+                    state.stack[state.stackTop - 2] = tmp;
+                    state.stackTop++;
+                case DUP_X2:
+                    assert state.stackTop > 3;
+                    tmp = state.stack[state.stackTop - 1];
+                    state.stack[state.stackTop] = state.stack[state.stackTop - 1];
+                    state.stack[state.stackTop - 1] = state.stack[state.stackTop - 2];
+                    state.stack[state.stackTop - 2] = state.stack[state.stackTop - 3];
+                    state.stack[state.stackTop - 3] = tmp;
+                    state.stackTop++;
+                    break;
                 case SWAP:
                     assert state.stackTop > 1;
-                    TypeHints.TypeB tmp = state.stack[state.stackTop - 1];
+                    tmp = state.stack[state.stackTop - 1];
                     state.stack[state.stackTop - 1] = state.stack[state.stackTop - 2];
                     state.stack[state.stackTop - 2] = tmp;
                     break;

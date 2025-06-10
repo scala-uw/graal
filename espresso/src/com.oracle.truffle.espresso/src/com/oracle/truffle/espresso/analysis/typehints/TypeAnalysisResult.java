@@ -1,15 +1,27 @@
 package com.oracle.truffle.espresso.analysis.typehints;
 
-import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints.TypeB;
+import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 
 public class TypeAnalysisResult {
-    final TypeB[] operands;
+    final TypeHints.TypeB[] operands;
 
-    TypeAnalysisResult(TypeB[] content) {
+    TypeAnalysisResult(TypeHints.TypeB[] content) {
         this.operands = content;
     }
 
-    public TypeB[] getOperandsTypes() {
+    public TypeHints.TypeB[] getOperandsTypes() {
         return operands;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("TypeAnalysisResult{");
+        sb.append("operands=[");
+        for (TypeHints.TypeB operand : operands) {
+            sb.append(operand != null ? operand.toString() : "null").append(", ");
+        }
+        sb.append("]}");
+        return sb.toString();
     }
 }

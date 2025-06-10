@@ -58,6 +58,7 @@ import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.espresso.EspressoLanguage;
 import com.oracle.truffle.espresso.analysis.liveness.LivenessAnalysis;
+import com.oracle.truffle.espresso.analysis.typehints.TypeAnalysisResult;
 import com.oracle.truffle.espresso.analysis.typehints.TypeAnalysisState;
 import com.oracle.truffle.espresso.analysis.typehints.TypeHintAnalysis;
 import com.oracle.truffle.espresso.bytecode.MapperBCI;

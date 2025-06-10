@@ -1393,7 +1393,7 @@ public final class ClassfileParser {
             byte kind = (byte) stream.readU1();
             int index = stream.readU2();
             entries[i] = new InvokeReturnTypeAttribute.Entry(
-                bcOffset, new TypeHints.TypeA(kind, index));
+                bcOffset, new TypeHints.TypeB(kind, index));
         }
         return new InvokeReturnTypeAttribute(name, entries);
     }

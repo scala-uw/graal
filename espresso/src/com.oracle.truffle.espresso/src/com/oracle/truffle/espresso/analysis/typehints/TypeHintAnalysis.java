@@ -24,21 +24,22 @@ public class TypeHintAnalysis {
         BlockIterator.analyze(method, graph, closure);
         System.out.println("Type hints analysis completed for method: " + method.getName());
         System.out.println("Resulting type hints: ");
-        for (int i = 0; i < closure.getResAtBCI().length; i++) {
-            System.out.println("BCI " + i + ": " + closure.getResAtBCI()[i]);
+        for (int i = 0; i < closure.getRes().length; i++) {
+            TypeAnalysisResult res = closure.getRes()[i];
+            if (res != null) System.out.println("BCI " + i + ": " + closure.getRes()[i]);
         }
-        return new TypeHintAnalysis(closure.getResAtBCI());
+        return new TypeHintAnalysis(closure.getRes());
     }
 
     @CompilationFinal(dimensions = 1)
-    private final TypeAnalysisState[] resAtBCI;
+    private final TypeAnalysisResult[] res;
 
-    private TypeHintAnalysis(TypeAnalysisState[] resAtBCI) {
-        this.resAtBCI = resAtBCI;
+    private TypeHintAnalysis(TypeAnalysisResult[] res) {
+        this.res = res;
     }
 
-    public TypeAnalysisState[] getResAtBCI() {
-        return resAtBCI;
+    public TypeAnalysisResult[] getRes() {
+        return res;
     }
 
 
