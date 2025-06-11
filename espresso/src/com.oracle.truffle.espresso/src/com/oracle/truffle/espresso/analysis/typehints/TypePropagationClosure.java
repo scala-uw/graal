@@ -19,6 +19,7 @@ import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ALOAD_0;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ALOAD_1;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ALOAD_2;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ALOAD_3;
+import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ARETURN;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ASTORE;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ASTORE_0;
 import static com.oracle.truffle.espresso.classfile.bytecode.Bytecodes.ASTORE_1;
@@ -140,9 +141,15 @@ public class TypePropagationClosure extends BlockIteratorClosure{
         while (bci <= block.end()){
             int opcode = bs.currentBC(bci);
             int cpi; int stackEffect; TypeHints.TypeB tmp;
-            if (debug) System.out.println("Processing opcode: " + Bytecodes.nameOf(opcode) + " at bci: " + bci);
+            if (debug) System.out.println("Processing BCI: " + bci + " opcode: " + Bytecodes.nameOf(opcode));
             if (debug) System.out.println("Current state: " + state);
             switch (opcode){
+                case ARETURN:
+                    assert state.stackTop > 0;
+                    this.resAtBCI[bci] = 
+                        new TypeAnalysisResult(new TypeHints.TypeB[]{state.stack[state.stackTop - 1]});
+                    if (debug) System.out.println("Areturn stack top: " + state.stack[state.stackTop - 1]);
+                    break;
                 case ASTORE:
                 case ASTORE_0:
                 case ASTORE_1:
