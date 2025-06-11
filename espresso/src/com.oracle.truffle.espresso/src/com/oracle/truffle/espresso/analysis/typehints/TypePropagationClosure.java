@@ -300,6 +300,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     state.stack[state.stackTop - 1] = state.stack[state.stackTop - 2];
                     state.stack[state.stackTop - 2] = tmp;
                     state.stackTop++;
+                    break;
                 case DUP_X2:
                     assert state.stackTop > 3;
                     tmp = state.stack[state.stackTop - 1];
