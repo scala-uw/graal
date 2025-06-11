@@ -59,7 +59,6 @@ import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.espresso.EspressoLanguage;
 import com.oracle.truffle.espresso.analysis.liveness.LivenessAnalysis;
 import com.oracle.truffle.espresso.analysis.typehints.TypeAnalysisResult;
-import com.oracle.truffle.espresso.analysis.typehints.TypeAnalysisState;
 import com.oracle.truffle.espresso.analysis.typehints.TypeHintAnalysis;
 import com.oracle.truffle.espresso.bytecode.MapperBCI;
 import com.oracle.truffle.espresso.classfile.ExceptionHandler;
@@ -483,6 +482,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
     private final TypeAnalysisResult[] typeAnalysisRes;
 
+    private final boolean reifiedEnabled = true;
+
     public BytecodeNode(MethodVersion methodVersion) {
         CompilerAsserts.neverPartOfCompilation();
         Method method = methodVersion.getMethod();
@@ -808,6 +809,9 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 System.out.println("MethodParameterTypeAttribute: " + methodParameterType);
                 System.out.println("InvokeReturnTypeAttribute: " + invokeReturnType);
                 System.out.println("MethodReturnTypeAttribute: " + methodReturnType);
+                for (int i = 0; i < reifiedTypesCnt; i++) {
+                    System.out.println("Reified type at " + i + ": " + getReifiedTypeAt(frame, startReifiedTypes, i));
+                }
         }
 
         if (instrument != null) {
@@ -861,6 +865,25 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         ++top;
                     }
                 }
+
+                if (methodTypeParameterCount != null) {
+                    System.out.println("curBCI: " + curBCI + ", curOpcode: " + Bytecodes.nameOf(curOpcode));
+                }
+                TypeHints.TypeB[] typePropagationOperands = null;
+                if (typeAnalysisRes != null){
+                    if (curBCI >= typeAnalysisRes.length){
+                        System.out.println("curBCI: " + curBCI + ", curOpcode: " + Bytecodes.nameOf(curOpcode) + " exceeds typeAnalysisRes length: " + typeAnalysisRes.length);
+                        System.out.println("typeAnalysisRes at the end: " + typeAnalysisRes[typeAnalysisRes.length - 1]);
+                        typePropagationOperands = 
+                            typeAnalysisRes[typeAnalysisRes.length - 1] == null ? null : typeAnalysisRes[typeAnalysisRes.length - 1].getOperandsTypes();
+                    } else {
+                        typePropagationOperands = typeAnalysisRes[curBCI] == null ? null : typeAnalysisRes[curBCI].getOperandsTypes();
+                    }
+                }
+                CompilerAsserts.partialEvaluationConstant(typePropagationOperands);
+                if (methodTypeParameterCount != null) {
+                    System.out.println("typePropagationOperands at BCI " + curBCI + " curOpcode: " + Bytecodes.nameOf(curOpcode) + ": " + Arrays.toString(typePropagationOperands));
+                }
                 // @formatter:off
                 switch (curOpcode) {
                     case NOP: break;
@@ -907,11 +930,68 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         putDouble(frame, top, getLocalDouble(frame, bs.readLocalIndex1(curBCI)));
                         livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
                         break;
+                    case ALOAD_0:
+                    case ALOAD_1: // fall through
+                    case ALOAD_2: // fall through
+                    case ALOAD_3:
+                        // putObject(frame, top, getLocalObject(frame, curOpcode - ALOAD_0));
+                        // livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
+                        // break;
                     case ALOAD:
-                        putObject(frame, top, getLocalObject(frame, bs.readLocalIndex1(curBCI)));
-                        livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
-                        break;
-
+                        int aloadIndex;
+                        if (curOpcode == ALOAD) {
+                            aloadIndex = bs.readLocalIndex1(curBCI);
+                        } else {
+                            aloadIndex = curOpcode - ALOAD_0;
+                        }
+                        if (typePropagationOperands != null && reifiedEnabled) {
+                            assert typePropagationOperands.length == 1 : "Expected exactly one operand for ALOAD";
+                            TypeHints.TypeB typeB = typePropagationOperands[0];
+                            if (typeB == null) {
+                                putObject(frame, top, getLocalObject(frame, aloadIndex));
+                                livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
+                                break;
+                            } else {
+                                byte kind = typeB.getKind();
+                                int index = typeB.getIndex();
+                                int reifiedValue = -1;
+                                if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
+                                    reifiedValue = getReifiedTypeAt(frame, startReifiedTypes, index);
+                                } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
+                                    // TODO
+                                } else if (kind == TypeHints.TypeB.REFERENCE) {
+                                    
+                                } else {
+                                    throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in ALOAD at BCI " + curBCI);
+                                }
+                                if (reifiedValue == TypeHints.TypeA.BYTE){
+                                    putInt(frame, top, getLocalInt(frame, aloadIndex));
+                                } else if (reifiedValue == TypeHints.TypeA.CHAR){
+                                    putInt(frame, top, getLocalInt(frame, aloadIndex));
+                                } else if (reifiedValue == TypeHints.TypeA.DOUBLE) {
+                                    putDouble(frame, top, getLocalDouble(frame, aloadIndex));
+                                } else if (reifiedValue == TypeHints.TypeA.FLOAT) {
+                                    putFloat(frame, top, getLocalFloat(frame, aloadIndex));
+                                } else if (reifiedValue == TypeHints.TypeA.INT){
+                                    putInt(frame, top, getLocalInt(frame, aloadIndex));
+                                } else if (reifiedValue == TypeHints.TypeA.LONG) {
+                                    putLong(frame, top, getLocalLong(frame, aloadIndex));
+                                } else if (reifiedValue == TypeHints.TypeA.SHORT){
+                                    putInt(frame, top, getLocalInt(frame, aloadIndex));
+                                } else if (reifiedValue == TypeHints.TypeA.BOOLEAN){
+                                    putInt(frame, top, getLocalInt(frame, aloadIndex));
+                                } else {
+                                    putObject(frame, top, getLocalObject(frame, aloadIndex));
+                                }
+                                // putObject(frame, top, getLocalObject(frame, aloadIndex));
+                                livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
+                                break;
+                            }
+                        } else {
+                            putObject(frame, top, getLocalObject(frame, aloadIndex));
+                            livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
+                            break;
+                        }
                     case ILOAD_0: // fall through
                     case ILOAD_1: // fall through
                     case ILOAD_2: // fall through
@@ -940,17 +1020,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         putDouble(frame, top, getLocalDouble(frame, curOpcode - DLOAD_0));
                         livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
                         break;
-                    case ALOAD_0:
-                        putObject(frame, top, getLocalObject(frame, 0));
-                        livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
-                        break;
-                    case ALOAD_1: // fall through
-                    case ALOAD_2: // fall through
-                    case ALOAD_3:
-                        putObject(frame, top, getLocalObject(frame, curOpcode - ALOAD_0));
-                        livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
-                        break;
-
                     case IALOAD: // fall through
                     case LALOAD: // fall through
                     case FALOAD: // fall through
@@ -979,11 +1048,67 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         setLocalDouble(frame, bs.readLocalIndex1(curBCI), popDouble(frame, top - 1));
                         livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
                         break;
+                    case ASTORE_0: // fall through
+                    case ASTORE_1: // fall through
+                    case ASTORE_2: // fall through
+                    case ASTORE_3:
+                        // setLocalObjectOrReturnAddress(frame, curOpcode - ASTORE_0, popReturnAddressOrObject(frame, top - 1));
+                        // livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
+                        // break;
                     case ASTORE:
-                        setLocalObjectOrReturnAddress(frame, bs.readLocalIndex1(curBCI), popReturnAddressOrObject(frame, top - 1));
-                        livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
-                        break;
-
+                        int astoreIndex;
+                        if (curOpcode == ASTORE) {
+                            astoreIndex = bs.readLocalIndex1(curBCI);
+                        } else {
+                            astoreIndex = curOpcode - ASTORE_0;
+                        }
+                        if (typePropagationOperands != null && reifiedEnabled){
+                            assert typePropagationOperands.length == 1 : "Expected exactly one operand for ASTORE";
+                            TypeHints.TypeB typeB = typePropagationOperands[0];
+                            if (typeB == null) {
+                                setLocalObjectOrReturnAddress(frame, astoreIndex, popReturnAddressOrObject(frame, top - 1));
+                                livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
+                                break;
+                            } else {
+                                byte kind = typeB.getKind();
+                                int index = typeB.getIndex();
+                                int reifiedValue = -1;
+                                if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
+                                    reifiedValue = getReifiedTypeAt(frame, startReifiedTypes, index);
+                                } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
+                                    // TODO
+                                } else if (kind == TypeHints.TypeB.REFERENCE) {
+                                    
+                                } else {
+                                    throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in ALOAD at BCI " + curBCI);
+                                }
+                                if (reifiedValue == TypeHints.TypeA.BYTE){
+                                    setLocalInt(frame, astoreIndex, popInt(frame, top - 1));
+                                } else if (reifiedValue == TypeHints.TypeA.CHAR){
+                                    setLocalInt(frame, astoreIndex, popInt(frame, top - 1));
+                                } else if (reifiedValue == TypeHints.TypeA.DOUBLE) {
+                                    setLocalDouble(frame, astoreIndex, popDouble(frame, top - 1));
+                                } else if (reifiedValue == TypeHints.TypeA.FLOAT) {
+                                    setLocalFloat(frame, astoreIndex, popFloat(frame, top - 1));
+                                } else if (reifiedValue == TypeHints.TypeA.INT){
+                                    setLocalInt(frame, astoreIndex, popInt(frame, top - 1));
+                                } else if (reifiedValue == TypeHints.TypeA.LONG) {
+                                    setLocalLong(frame, astoreIndex, popLong(frame, top - 1));
+                                } else if (reifiedValue == TypeHints.TypeA.SHORT){
+                                    setLocalInt(frame, astoreIndex, popInt(frame, top - 1));
+                                } else if (reifiedValue == TypeHints.TypeA.BOOLEAN){
+                                    setLocalInt(frame, astoreIndex, popInt(frame, top - 1));
+                                } else {
+                                    setLocalObjectOrReturnAddress(frame, astoreIndex, popReturnAddressOrObject(frame, top - 1));
+                                }
+                                livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
+                            break;
+                            }
+                        } else {
+                            setLocalObjectOrReturnAddress(frame, astoreIndex, popReturnAddressOrObject(frame, top - 1));
+                            livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
+                            break;
+                        }
                     case ISTORE_0: // fall through
                     case ISTORE_1: // fall through
                     case ISTORE_2: // fall through
@@ -1012,14 +1137,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         setLocalDouble(frame, curOpcode - DSTORE_0, popDouble(frame, top - 1));
                         livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
                         break;
-                    case ASTORE_0: // fall through
-                    case ASTORE_1: // fall through
-                    case ASTORE_2: // fall through
-                    case ASTORE_3:
-                        setLocalObjectOrReturnAddress(frame, curOpcode - ASTORE_0, popReturnAddressOrObject(frame, top - 1));
-                        livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
-                        break;
-
                     case IASTORE: // fall through
                     case LASTORE: // fall through
                     case FASTORE: // fall through
