@@ -80,10 +80,11 @@ public class TypeHints {
         // public static final byte IS_ARRAY = 0;
         // public static final byte NOT_ARRAY = 1;
 
-        public static final byte K_KIND = 'K';
-        public static final byte M_KIND = 'M';
-        public static final byte ARR_K_KIND = 'k';
-        public static final byte ARR_M_KIND = 'm';
+        public static final byte CLASS_TYPE_PARAM = 'K';
+        public static final byte METHOD_TYPE_PARAM = 'M';
+        public static final byte ARR_CLASS_TYPE_PARAM = 'k';
+        public static final byte ARR_METHOD_TYPE_PARAM = 'm';
+        public static final byte REFERENCE = 'L';
 
         // private final byte isArray;
         private final byte kind;
