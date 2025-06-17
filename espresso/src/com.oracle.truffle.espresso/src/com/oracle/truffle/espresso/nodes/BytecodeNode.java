@@ -479,6 +479,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
     private final int reifiedTypesCnt;
     private final TypeHints.TypeA[][] instructionTypeArgHints;
+    private final TypeHints.TypeB[] invokeReturnTypeHints;
+    private final TypeHints.TypeB[] methodParameterTypeHints;
 
     private final TypeAnalysisResult[] typeAnalysisRes;
 
@@ -506,6 +508,22 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             for (InstructionTypeArgumentsAttribute.Entry entry : instTypeArgAttr.getEntries()) {
                 this.instructionTypeArgHints[entry.getBytecodeOffset()] = entry.getTypeArguments();
                 maxExtraStack = Math.max(maxExtraStack, entry.getTypeArguments().length);
+            }
+        }
+
+        MethodParameterTypeAttribute methodParameterTypeAttribute = methodVersion.getMethod().getMethodParameterTypeAttribute();
+        if (methodParameterTypeAttribute != null){
+            this.methodParameterTypeHints = methodParameterTypeAttribute.getParameterTypes();
+        } else {
+            this.methodParameterTypeHints = new TypeHints.TypeB[
+                SignatureSymbols.parameterCount(method.getParsedSignature())];
+        }
+
+        this.invokeReturnTypeHints = new TypeHints.TypeB[this.bs.endBCI()];
+        InvokeReturnTypeAttribute invokeReturnTypeAttr = methodVersion.getMethod().getInvokeReturnTypeAttribute();
+        if (invokeReturnTypeAttr != null) {
+            for (InvokeReturnTypeAttribute.Entry entry : invokeReturnTypeAttr.getEntries()) {
+                this.invokeReturnTypeHints[entry.getBytecodeOffset()] = entry.getReturnType();
             }
         }
 
@@ -553,6 +571,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
         Symbol<Type>[] methodSignature = getMethod().getParsedSignature();
         int argCount = SignatureSymbols.parameterCount(methodSignature);
+        assert methodParameterTypeHints.length == argCount: "parameter hints length different from argument length";
         CompilerAsserts.partialEvaluationConstant(argCount);
         for (int i = 0; i < argCount; ++i) {
             Symbol<Type> argType = SignatureSymbols.parameterType(methodSignature, i);
@@ -569,10 +588,56 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 case '[' : // fall through
                 case 'L' : {
                     // Reference type.
-                    StaticObject argument = (StaticObject) arguments[i + receiverSlot];
-                    setLocalObject(frame, curSlot, argument);
-                    checkNoForeignObjectAssumption(argument);
-                    break;
+                    if (reifiedEnabled){
+                        TypeHints.TypeB typeB = methodParameterTypeHints[i];
+                        if (typeB == null){
+                            StaticObject argument = (StaticObject) arguments[i + receiverSlot];
+                            setLocalObject(frame, curSlot, argument);
+                            checkNoForeignObjectAssumption(argument);
+                            break;
+                        } else {
+                            byte kind = typeB.getKind();
+                            int index = typeB.getIndex();
+                            byte reifiedValue = -1;
+                            if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM){
+                                reifiedValue = (byte) arguments[argCount + receiverSlot + index]; //TODO, CHECK THIS!!
+                            } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM){
+                                //TODO
+                            } else {
+                                CompilerDirectives.transferToInterpreterAndInvalidate();
+                                throw EspressoError.shouldNotReachHere("Unexpected type hint kind at BytecodeNode.initArguments: " + kind);
+                            }
+                            if (reifiedValue == TypeHints.TypeA.BYTE){
+                                setLocalInt(frame, curSlot, ((byte) arguments[i + receiverSlot])); break;
+                            } else if (reifiedValue == TypeHints.TypeA.CHAR){
+                                setLocalInt(frame, curSlot, ((char) arguments[i + receiverSlot])); break;
+                            } else if (reifiedValue == TypeHints.TypeA.DOUBLE){
+                                setLocalDouble(frame, curSlot, ((double) arguments[i + receiverSlot])); break;
+                            } else if (reifiedValue == TypeHints.TypeA.FLOAT){
+                                setLocalFloat(frame, curSlot, ((float) arguments[i + receiverSlot])); break;
+                            } else if (reifiedValue == TypeHints.TypeA.INT){
+                                setLocalInt(frame, curSlot, ((int) arguments[i + receiverSlot])); break;
+                            } else if (reifiedValue == TypeHints.TypeA.LONG){
+                                setLocalLong(frame, curSlot, ((long) arguments[i + receiverSlot])); break;
+                            } else if (reifiedValue == TypeHints.TypeA.SHORT){
+                                setLocalInt(frame, curSlot, ((short) arguments[i + receiverSlot])); break;
+                            } else if (reifiedValue == TypeHints.TypeA.BOOLEAN){
+                                setLocalInt(frame, curSlot, ((boolean) arguments[i + receiverSlot]) ? 1 : 0); break;
+                            } else {
+                                System.out.println(Arrays.toString(arguments));
+                                System.out.println("t BytecodeNode.initArguments: " + reifiedValue + " typeB :: " + typeB + " arg: " + arguments[i + receiverSlot]);
+                                StaticObject argument = (StaticObject) arguments[i + receiverSlot];
+                                setLocalObject(frame, curSlot, argument);
+                                checkNoForeignObjectAssumption(argument);
+                                break;
+                            }
+                        }
+                    } else {
+                        StaticObject argument = (StaticObject) arguments[i + receiverSlot];
+                        setLocalObject(frame, curSlot, argument);
+                        checkNoForeignObjectAssumption(argument);
+                        break;
+                    }
                 }
                 default :
                     CompilerDirectives.transferToInterpreterAndInvalidate();
@@ -792,6 +857,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         int startReifiedTypes = startingReifiedTypesOffset(getMethodVersion().getMaxLocals());
         CompilerAsserts.partialEvaluationConstant(startReifiedTypes);
 
+        boolean printBCIOPCode = false;
+
         //get and print the method attributes(if not all null)
         MethodTypeParameterCountAttribute methodTypeParameterCount = methodVersion.getMethod().getMethodTypeParameterCountAttribute();
         InstructionTypeArgumentsAttribute instructionTypeArguments = methodVersion.getMethod().getInstructionTypeArgumentsAttribute();
@@ -812,6 +879,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 for (int i = 0; i < reifiedTypesCnt; i++) {
                     System.out.println("Reified type at " + i + ": " + getReifiedTypeAt(frame, startReifiedTypes, i));
                 }
+                printBCIOPCode = true;
         }
 
         if (instrument != null) {
@@ -850,9 +918,16 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     setBCI(frame, curBCI);
                 }
 
+                if (printBCIOPCode) {
+                    System.out.println("BytecodeNode.executeBodyFromBCI: curBCI: " + curBCI + ", curOpcode: " + Bytecodes.nameOf(curOpcode) +
+                            ", top: " + top + ", statementIndex: " + statementIndex);
+                }
+
                 if (instructionTypeArgHints[curBCI] != null) {
                     CompilerAsserts.partialEvaluationConstant(instructionTypeArgHints[curBCI].length);
                     for (TypeHints.TypeA typeArg : instructionTypeArgHints[curBCI]) {
+                        System.out.println("curBCI: " + curBCI + ", curOpcode: " + Bytecodes.nameOf(curOpcode) +
+                                ", typeArg: " + typeArg + ", kind: " + typeArg.getKind() + ", index: " + typeArg.getIndex());
                         byte kind = typeArg.getKind();
                         CompilerAsserts.partialEvaluationConstant(kind);
                         if (kind == TypeHints.TypeA.METHOD_TYPE_PARAM) {
@@ -954,7 +1029,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                             } else {
                                 byte kind = typeB.getKind();
                                 int index = typeB.getIndex();
-                                int reifiedValue = -1;
+                                byte reifiedValue = -1;
                                 if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
                                     reifiedValue = getReifiedTypeAt(frame, startReifiedTypes, index);
                                 } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
@@ -973,6 +1048,10 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                 } else if (reifiedValue == TypeHints.TypeA.FLOAT) {
                                     putFloat(frame, top, getLocalFloat(frame, aloadIndex));
                                 } else if (reifiedValue == TypeHints.TypeA.INT){
+                                    if (getMethod().getName().toString().equals("identity")){
+                                        System.out.println("identity aload reified int, loading: " + getLocalInt(frame, aloadIndex));
+                                        // System.out.println("2-identity aload, loading: " + getLocalObject(frame, aloadIndex).toVerboseString());
+                                    }
                                     putInt(frame, top, getLocalInt(frame, aloadIndex));
                                 } else if (reifiedValue == TypeHints.TypeA.LONG) {
                                     putLong(frame, top, getLocalLong(frame, aloadIndex));
@@ -988,6 +1067,9 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                 break;
                             }
                         } else {
+                            if (getMethod().getName().toString().equals("identity")){
+                                System.out.println("not reified: identity aload, loading: " + getLocalObject(frame, aloadIndex).toVerboseString());
+                            }
                             putObject(frame, top, getLocalObject(frame, aloadIndex));
                             livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
                             break;
@@ -1072,7 +1154,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                             } else {
                                 byte kind = typeB.getKind();
                                 int index = typeB.getIndex();
-                                int reifiedValue = -1;
+                                byte reifiedValue = -1;
                                 if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
                                     reifiedValue = getReifiedTypeAt(frame, startReifiedTypes, index);
                                 } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
@@ -1480,7 +1562,26 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         if (CompilerDirectives.hasNextTier() && loopCount.value > 0) {
                             LoopNode.reportLoopCount(this, loopCount.value);
                         }
-                        Object returnValue = getReturnValueAsObject(frame, top);
+                        int reifiedReturnType = TypeHints.TypeA.REFERENCE;
+                        if (typePropagationOperands != null && reifiedEnabled){
+                            assert typePropagationOperands.length == 1 : "Expected one operand for return";
+                            TypeHints.TypeB typeB = typePropagationOperands[0];
+                            if (typeB != null){
+                                byte kind = typeB.getKind();
+                                int index = typeB.getIndex();
+                                if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
+                                    reifiedReturnType = getReifiedTypeAt(frame, startReifiedTypes, index);
+                                } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
+                                    // TODO
+                                } else if (kind == TypeHints.TypeB.REFERENCE) {
+                                    
+                                } else {
+                                    throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in ALOAD at BCI " + curBCI);
+                                }
+                            }
+                        }
+                        Object returnValue = getReturnValueAsObject(frame, top, reifiedReturnType);
+                        if (methodReturnType != null) System.out.println("returning reified type: " + returnValue);
                         if (instrument != null) {
                             instrument.exitAt(frame, statementIndex, returnValue);
                         }
@@ -1519,8 +1620,40 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     case INVOKESPECIAL: // fall through
                     case INVOKESTATIC:  // fall through
                     case INVOKEINTERFACE:
-                        top += quickenInvoke(frame, top, curBCI, curOpcode, statementIndex); break;
-
+                        if (typePropagationOperands != null && reifiedEnabled){
+                            int[] argumentReifiedTypeValues = new int[typePropagationOperands.length];
+                            for (int i = 0; i < typePropagationOperands.length; i++) {
+                                TypeHints.TypeB typeB = typePropagationOperands[i];
+                                if (typeB == null){
+                                    argumentReifiedTypeValues[i] = TypeHints.TypeA.REFERENCE;
+                                } else {
+                                    byte kind = typeB.getKind();
+                                    int index = typeB.getIndex();
+                                    if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
+                                        argumentReifiedTypeValues[i] = getReifiedTypeAt(frame, startReifiedTypes, index);
+                                    } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
+                                        // TODO
+                                    } else if (kind == TypeHints.TypeB.REFERENCE) {
+                                        argumentReifiedTypeValues[i] = TypeHints.TypeA.REFERENCE;
+                                    } else {
+                                        throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in ALOAD at BCI " + curBCI);
+                                    }
+                                }
+                            }
+                            System.out.println("Invoking with reified types: " + Arrays.toString(argumentReifiedTypeValues));
+                            top += quickenInvoke(frame, top, curBCI, curOpcode, statementIndex, reifiedEnabled, startReifiedTypes); break;
+                        } else {
+                            if (instructionTypeArgHints[curBCI] != null){
+                                CompilerAsserts.partialEvaluationConstant(instructionTypeArgHints[curBCI].length);
+                                System.out.println("Invoking with type args: " + Arrays.toString(instructionTypeArgHints[curBCI]));
+                                top += quickenInvoke(frame, top, curBCI, curOpcode, statementIndex, reifiedEnabled, startReifiedTypes);
+                                break;
+                            } else {
+                                if (printBCIOPCode) System.out.println("Invoking without type args at BCI " + curBCI);
+                                top += quickenInvoke(frame, top, curBCI, curOpcode, statementIndex);
+                                break;
+                            }
+                        }
                     case NEW         :
                         Klass klass = resolveType(NEW, bs.readCPI2(curBCI));
                         putObject(frame, top, newReferenceObject(klass)); break;
@@ -1712,6 +1845,47 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         assert top == startingStackOffset(getMethodVersion().getMaxLocals(), this.reifiedTypesCnt) + 1;
                         assert curBCI == returnValueBci;
                         return frame.getObjectStatic(top - 1);
+                        // if (typePropagationOperands != null && reifiedEnabled){
+                        //     assert typePropagationOperands.length == 1 : "Expected one operand for return_value";
+                        //     TypeHints.TypeB typeB = typePropagationOperands[0];
+                        //     if (typeB == null){
+                        //         return frame.getObjectStatic(top - 1);
+                        //     } else {
+                        //         byte kind = typeB.getKind();
+                        //         int index = typeB.getIndex();
+                        //         byte reifiedValue = -1;
+                        //         if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
+                        //             reifiedValue = getReifiedTypeAt(frame, startReifiedTypes, index);
+                        //         } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
+                        //             // TODO
+                        //         } else if (kind == TypeHints.TypeB.REFERENCE) {
+                                    
+                        //         } else {
+                        //             throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in ALOAD at BCI " + curBCI);
+                        //         }
+                        //         if (reifiedValue == TypeHints.TypeA.BYTE){
+                        //             return frame.getIntStatic(top - 1);
+                        //         } else if (reifiedValue == TypeHints.TypeA.CHAR){
+                        //             return frame.getIntStatic(top - 1);
+                        //         } else if (reifiedValue == TypeHints.TypeA.DOUBLE) {
+                        //             return frame.getDoubleStatic(top - 1);
+                        //         } else if (reifiedValue == TypeHints.TypeA.FLOAT) {
+                        //             return frame.getFloatStatic(top - 1);
+                        //         } else if (reifiedValue == TypeHints.TypeA.INT){
+                        //             return frame.getIntStatic(top - 1);
+                        //         } else if (reifiedValue == TypeHints.TypeA.LONG) {
+                        //             return frame.getLongStatic(top - 1);
+                        //         } else if (reifiedValue == TypeHints.TypeA.SHORT){
+                        //             return frame.getIntStatic(top - 1);
+                        //         } else if (reifiedValue == TypeHints.TypeA.BOOLEAN){
+                        //             return frame.getIntStatic(top - 1);
+                        //         } else {
+                        //             return frame.getObjectStatic(top - 1);
+                        //         }
+                        //     }
+                        // } else {
+                        //     return frame.getObjectStatic(top - 1);
+                        // }
                     case THROW_VALUE:
                         /*
                          * Synthetic bytecode used to avoid merging interpreter loop exits too early
@@ -1966,7 +2140,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         });
     }
 
-    private Object getReturnValueAsObject(VirtualFrame frame, int top) {
+    private Object getReturnValueAsObject(VirtualFrame frame, int top, int reifiedReturnType) {
         Symbol<Type> returnType = SignatureSymbols.returnType(getMethod().getParsedSignature());
         // @formatter:off
         switch (returnType.byteAt(0)) {
@@ -1980,7 +2154,26 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             case 'D' : return popDouble(frame, top - 1);
             case 'V' : return StaticObject.NULL; // void
             case '[' : // fall through
-            case 'L' : return popObject(frame, top - 1);
+            case 'L' : 
+                if (reifiedReturnType == TypeHints.TypeA.BYTE){
+                    return (byte) popInt(frame, top - 1);
+                } else if (reifiedReturnType == TypeHints.TypeA.CHAR){
+                    return (char) popInt(frame, top - 1);
+                } else if (reifiedReturnType == TypeHints.TypeA.DOUBLE) {
+                    return popDouble(frame, top - 1);
+                } else if (reifiedReturnType == TypeHints.TypeA.FLOAT) {
+                    return popFloat(frame, top - 1);
+                } else if (reifiedReturnType == TypeHints.TypeA.INT){
+                    return popInt(frame, top - 1);
+                } else if (reifiedReturnType == TypeHints.TypeA.LONG) {
+                    return popLong(frame, top - 1);
+                } else if (reifiedReturnType == TypeHints.TypeA.SHORT){
+                    return (short) popInt(frame, top - 1);
+                } else if (reifiedReturnType == TypeHints.TypeA.BOOLEAN){
+                    return stackIntToBoolean(popInt(frame, top - 1));
+                } else {
+                    return popObject(frame, top - 1);
+                }
             default:
                 CompilerDirectives.transferToInterpreterAndInvalidate();
                 throw EspressoError.shouldNotReachHere();
@@ -2462,9 +2655,14 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         return 0; // Bytecodes.stackEffectOf(opcode);
     }
 
-    @SuppressWarnings("try")
     private int quickenInvoke(VirtualFrame frame, int top, int curBCI, int opcode, int statementIndex) {
-        InvokeQuickNode quick = quickenInvoke(top, curBCI, opcode, statementIndex);
+        return quickenInvoke(frame, top, curBCI, opcode, statementIndex, false, -1);
+    }
+
+    @SuppressWarnings("try")
+    private int  quickenInvoke(VirtualFrame frame, int top, int curBCI, int opcode, int statementIndex,
+                              boolean reifiedEnabled, int startReifiedTypes) {
+        InvokeQuickNode quick = quickenInvoke(top, curBCI, opcode, statementIndex, reifiedEnabled, startReifiedTypes);
         if (opcode == INVOKESTATIC && quick instanceof InvokeStaticQuickNode invokeStaticQuickNode) {
             try (EspressoLanguage.DisableSingleStepping ignored = getLanguage().disableStepping()) {
                 invokeStaticQuickNode.initializeResolvedKlass();
@@ -2479,11 +2677,18 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     }
 
     private InvokeQuickNode quickenInvoke(int top, int curBCI, int opcode, int statementIndex) {
+        return quickenInvoke(top, curBCI, opcode, statementIndex, false, -1);
+    }
+
+    private InvokeQuickNode quickenInvoke(int top, int curBCI, int opcode, int statementIndex,
+                                          boolean reifiedEnabled, int startReifiedTypes) {
         QUICKENED_INVOKES.inc();
         CompilerDirectives.transferToInterpreterAndInvalidate();
         assert Bytecodes.isInvoke(opcode);
         InvokeQuickNode quick = (InvokeQuickNode) tryPatchQuick(curBCI, cpi -> getResolvedInvoke(opcode, cpi),
-                        resolvedInvoke -> dispatchQuickened(top, curBCI, opcode, statementIndex, resolvedInvoke, getMethod().getContext().getEspressoEnv().bytecodeLevelInlining));
+                        resolvedInvoke -> 
+                        dispatchQuickened(top, curBCI, opcode, statementIndex, resolvedInvoke, getMethod().getContext().getEspressoEnv().bytecodeLevelInlining, 
+                                          reifiedEnabled, startReifiedTypes));
         return quick;
     }
 
@@ -2647,7 +2852,12 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
     // endregion quickenForeign
 
-    private InvokeQuickNode dispatchQuickened(int top, int curBCI, int opcode, int statementIndex, ResolvedInvoke resolvedInvoke, boolean allowBytecodeInlining) {
+    private InvokeQuickNode dispatchQuickened(int top, int curBCI, int opcode, int statementIndex, ResolvedInvoke resolvedInvoke, boolean allowBytecodeInlining){
+        return dispatchQuickened(top, curBCI, opcode, statementIndex, resolvedInvoke, allowBytecodeInlining, false, -1);
+    }
+
+    private InvokeQuickNode dispatchQuickened(int top, int curBCI, int opcode, int statementIndex, ResolvedInvoke resolvedInvoke, boolean allowBytecodeInlining,
+                                              boolean reifiedEnabled, int startReifiedTypes) {
         ResolvedCall<Klass, Method, Field> resolvedCall = resolvedInvoke.resolvedCall();
         Method resolved = resolvedCall.getResolvedMethod();
         CallKind callKind = resolvedCall.getCallKind();
@@ -2670,7 +2880,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             return switch (callKind) {
                 case STATIC          -> new InvokeStaticQuickNode(resolved, top, curBCI);
                 case ITABLE_LOOKUP   -> new InvokeInterfaceQuickNode(resolved, top, curBCI);
-                case VTABLE_LOOKUP   -> new InvokeVirtualQuickNode(resolved, top, curBCI);
+                case VTABLE_LOOKUP   -> new InvokeVirtualQuickNode(resolved, top, curBCI, reifiedEnabled, startReifiedTypes);
                 case DIRECT          -> new InvokeSpecialQuickNode(resolved, top, curBCI);
             };
             // @formatter:on

@@ -22,6 +22,8 @@
  */
 package com.oracle.truffle.espresso.nodes;
 
+import java.util.Arrays;
+
 import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.frame.Frame;
@@ -30,6 +32,7 @@ import com.oracle.truffle.api.frame.FrameSlotKind;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.espresso.classfile.JavaKind;
+import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.classfile.descriptors.SignatureSymbols;
 import com.oracle.truffle.espresso.classfile.descriptors.Symbol;
 import com.oracle.truffle.espresso.classfile.descriptors.Type;
@@ -345,10 +348,24 @@ public final class EspressoFrame {
         return result;
     }
 
-    @ExplodeLoop
-    public static Object[] popArguments(VirtualFrame frame, int top, boolean hasReceiver, final Symbol<Type>[] signature, int typeParamsCnt) {
-        int argCount = SignatureSymbols.parameterCount(signature);
+    private static byte getReifiedTypeAt(VirtualFrame frame, int startReifiedTypes, int n){
+        return (byte) frame.getIntStatic(startReifiedTypes + n);
+    }
 
+    public static Object[] popArguments(VirtualFrame frame, int top, boolean hasReceiver, final Symbol<Type>[] signature, int typeParamsCnt){
+        return popArguments(frame, top, hasReceiver, signature, typeParamsCnt, 
+                            false, new TypeHints.TypeB[SignatureSymbols.parameterCount(signature)], -1);
+    }
+
+    @ExplodeLoop
+    public static Object[] popArguments(VirtualFrame frame, int top, boolean hasReceiver, final Symbol<Type>[] signature, int typeParamsCnt, 
+                                        boolean reifiedEnabled, TypeHints.TypeB[] parameterHints, int startReifiedTypes) {
+        int argCount = SignatureSymbols.parameterCount(signature);
+        assert parameterHints.length == argCount : "Parameter hints length does not match the number of parameters in the signature";
+        if (reifiedEnabled){
+            System.out.println("popArguments: reifiedEnabled = true, startReifiedTypes = " + startReifiedTypes);
+            System.out.println("param hints: " + Arrays.toString(parameterHints));  
+        }
         int extraParam = hasReceiver ? 1 : 0;
         final Object[] args = new Object[argCount + extraParam + typeParamsCnt];
 
@@ -356,6 +373,8 @@ public final class EspressoFrame {
         CompilerAsserts.partialEvaluationConstant(signature);
         CompilerAsserts.partialEvaluationConstant(hasReceiver);
         CompilerAsserts.partialEvaluationConstant(typeParamsCnt);
+        CompilerAsserts.partialEvaluationConstant(parameterHints);
+        CompilerAsserts.partialEvaluationConstant(startReifiedTypes);
 
         int argAt = top - 1;
         for (int i = typeParamsCnt - 1; i >= 0; --i) {
@@ -375,7 +394,49 @@ public final class EspressoFrame {
                 case 'J' : args[i + extraParam] = popLong(frame, argAt);   --argAt; break;
                 case 'D' : args[i + extraParam] = popDouble(frame, argAt); --argAt; break;
                 case '[' : // fall through
-                case 'L' : args[i + extraParam] = popObject(frame, argAt);      break;
+                case 'L' : 
+                    if (reifiedEnabled){
+                        TypeHints.TypeB curArgHint = parameterHints[i];
+                        if (curArgHint == null || curArgHint.isNoHint()){
+                            args[i + extraParam] = popObject(frame, argAt);
+                        } else {
+                            byte kind = curArgHint.getKind();
+                            int index = curArgHint.getIndex();
+                            byte reifiedValue = -1;
+                            if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM){
+                                reifiedValue = (byte) args[argCount + extraParam + index]; //TODO, CHECK THIS!
+                                System.out.println(Arrays.toString(frame.getArguments()));
+                                System.out.println("in poparguments: reifiedValue: " + reifiedValue + ", index: " + index + ", kind: " + kind);
+                            } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM){
+                                //TODO
+                            } else {
+                                CompilerDirectives.transferToInterpreterAndInvalidate();
+                                throw EspressoError.shouldNotReachHere("Unexpected reified type kind: " + kind);
+                            }
+                            if (reifiedValue == TypeHints.TypeA.BYTE){
+                                args[i + extraParam] = (byte) popInt(frame, argAt);
+                            } else if (reifiedValue == TypeHints.TypeA.CHAR){
+                                args[i + extraParam] = (char) popInt(frame, argAt);
+                            } else if (reifiedValue == TypeHints.TypeA.DOUBLE){
+                                args[i + extraParam] = popDouble(frame, argAt);
+                            } else if (reifiedValue == TypeHints.TypeA.FLOAT){
+                                args[i + extraParam] = popFloat(frame, argAt);
+                            } else if (reifiedValue == TypeHints.TypeA.INT){
+                                args[i + extraParam] = popInt(frame, argAt);
+                            } else if (reifiedValue == TypeHints.TypeA.LONG){
+                                args[i + extraParam] = popLong(frame, argAt);
+                            } else if (reifiedValue == TypeHints.TypeA.SHORT){
+                                args[i + extraParam] = (short) popInt(frame, argAt);
+                            } else if (reifiedValue == TypeHints.TypeA.BOOLEAN){
+                                args[i + extraParam] = (popInt(frame, argAt) != 0);
+                            } else {
+                                args[i + extraParam] = popObject(frame, argAt);
+                            }
+                        }
+                    } else {
+                        args[i + extraParam] = popObject(frame, argAt);
+                    }
+                    break;
                 default  :
                     CompilerDirectives.transferToInterpreterAndInvalidate();
                     throw EspressoError.shouldNotReachHere();

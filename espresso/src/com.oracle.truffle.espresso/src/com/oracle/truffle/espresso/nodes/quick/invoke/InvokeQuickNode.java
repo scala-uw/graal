@@ -22,10 +22,16 @@
  */
 package com.oracle.truffle.espresso.nodes.quick.invoke;
 
+import java.util.Arrays;
+
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.espresso.classfile.attributes.reified.MethodParameterTypeAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.MethodReturnTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodTypeParameterCountAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.classfile.descriptors.SignatureSymbols;
 import com.oracle.truffle.espresso.impl.Method;
+import com.oracle.truffle.espresso.meta.EspressoError;
 import com.oracle.truffle.espresso.nodes.EspressoFrame;
 import com.oracle.truffle.espresso.nodes.quick.QuickNode;
 import com.oracle.truffle.espresso.runtime.staticobject.StaticObject;
@@ -43,6 +49,12 @@ public abstract class InvokeQuickNode extends QuickNode {
     // Helps check for no foreign objects
     private final boolean returnsPrimitive;
 
+    private final int startReifiedTypes;
+    private final TypeHints.TypeB[] parameterHints;
+    private final TypeHints.TypeB returnTypeHint;
+
+    private final boolean reifiedEnabled;
+
     public InvokeQuickNode(Method m, int top, int callerBCI) {
         super(top, callerBCI);
         this.method = m.getMethodVersion();
@@ -51,6 +63,45 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.resultAt = top - this.typeArgCnt -(SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.returnsPrimitive = m.getReturnKind().isPrimitive();
+        MethodParameterTypeAttribute methodParameterTypeAttribute = m.getMethodParameterTypeAttribute();
+        if (methodParameterTypeAttribute != null) {
+            this.parameterHints = methodParameterTypeAttribute.getParameterTypes();
+        } else {
+            this.parameterHints = null; // No hints available.
+        }
+        MethodReturnTypeAttribute returnTypeAttribute = m.getMethodReturnTypeAttribute();
+        if (returnTypeAttribute != null) {
+            this.returnTypeHint = returnTypeAttribute.getReturnType();
+        } else {
+            this.returnTypeHint = TypeHints.TypeB.NO_HINT; // No hint available.
+        }
+        this.startReifiedTypes = -1;
+        this.reifiedEnabled = false;
+    }
+
+    public InvokeQuickNode(Method m, int top, int callerBCI, 
+        boolean reifiedEnabled, int startReifiedTypes) {
+        super(top, callerBCI);
+        this.method = m.getMethodVersion();
+        MethodTypeParameterCountAttribute attr = m.getMethodTypeParameterCountAttribute();
+        this.typeArgCnt = (attr != null ? attr.getCount() : 0);
+        this.resultAt = top - this.typeArgCnt -(SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
+        this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
+        this.returnsPrimitive = m.getReturnKind().isPrimitive();
+        MethodParameterTypeAttribute methodParameterTypeAttribute = m.getMethodParameterTypeAttribute();
+        if (methodParameterTypeAttribute != null) {
+            this.parameterHints = methodParameterTypeAttribute.getParameterTypes();
+        } else {
+            this.parameterHints = null; // No hints available.
+        }
+        MethodReturnTypeAttribute returnTypeAttribute = m.getMethodReturnTypeAttribute();
+        if (returnTypeAttribute != null) {
+            this.returnTypeHint = returnTypeAttribute.getReturnType();
+        } else {
+            this.returnTypeHint = TypeHints.TypeB.NO_HINT; // No hint available.
+        }
+        this.startReifiedTypes = startReifiedTypes;
+        this.reifiedEnabled = reifiedEnabled;
     }
 
     public InvokeQuickNode(Method.MethodVersion version, int top, int callerBCI) {
@@ -62,6 +113,20 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.resultAt = top - this.typeArgCnt - (SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.returnsPrimitive = m.getReturnKind().isPrimitive();
+        MethodParameterTypeAttribute methodParameterTypeAttribute = m.getMethodParameterTypeAttribute();
+        if (methodParameterTypeAttribute != null) {
+            this.parameterHints = methodParameterTypeAttribute.getParameterTypes();
+        } else {
+            this.parameterHints = null; // No hints available.
+        }
+        MethodReturnTypeAttribute returnTypeAttribute = m.getMethodReturnTypeAttribute();
+        if (returnTypeAttribute != null) {
+            this.returnTypeHint = returnTypeAttribute.getReturnType();
+        } else {
+            this.returnTypeHint = TypeHints.TypeB.NO_HINT; // No hint available.
+        }
+        this.startReifiedTypes = -1;
+        this.reifiedEnabled = false;
     }
 
     public final StaticObject peekReceiver(VirtualFrame frame) {
@@ -73,6 +138,10 @@ public abstract class InvokeQuickNode extends QuickNode {
         return 0;
     }
 
+    private static byte getReifiedTypeAt(VirtualFrame frame, int startReifiedTypes, int n){
+        return (byte) frame.getIntStatic(startReifiedTypes + n);
+    }
+
     protected Object[] getArguments(VirtualFrame frame) {
         /*
          * Method signature does not change across methods. Can safely use the constant signature
@@ -82,7 +151,16 @@ public abstract class InvokeQuickNode extends QuickNode {
             // Don't create an array for empty arguments.
             return EMPTY_ARGS;
         }
-        return EspressoFrame.popArguments(frame, top, !method.isStatic(), method.getMethod().getParsedSignature(), this.typeArgCnt);
+        Object[] res = EspressoFrame.popArguments(frame, top, !method.isStatic(), method.getMethod().getParsedSignature(), 
+                        this.typeArgCnt, this.reifiedEnabled, this.parameterHints, this.startReifiedTypes);
+        if (method.getMethod().getName().toString().equals("identity")){
+            System.out.println("InvokeQuickNode.getArguments: ");
+            for (int i = 0; i < res.length; i++) {
+                System.out.print("," + i + ": " + res[i] + " (" + (res[i] != null ? res[i].getClass().getName() : "null") + ")");
+            }
+            System.out.println(":fin");
+        }
+        return res;
     }
 
     public final int pushResult(VirtualFrame frame, int result) {
@@ -112,11 +190,52 @@ public abstract class InvokeQuickNode extends QuickNode {
     }
 
     public final int pushResult(VirtualFrame frame, Object result) {
-        if (!returnsPrimitive) {
-            getBytecodeNode().checkNoForeignObjectAssumption((StaticObject) result);
+        if (!reifiedEnabled || returnTypeHint.isNoHint() || returnTypeHint.getKind() == TypeHints.TypeB.REFERENCE){
+            if (!returnsPrimitive) {
+                getBytecodeNode().checkNoForeignObjectAssumption((StaticObject) result);
+            }
+            EspressoFrame.putKind(frame, resultAt, result, method.getMethod().getReturnKind());
+            return stackEffect;
+        } else {
+            Object[] args = getArguments(frame);
+            System.out.println("InvokeQuickNode.pushResult: args: ");
+            for (int i = 0; i < args.length; i++) {
+                System.out.print("," + i + ": " + args[i] + " (" + (args[i] != null ? args[i].getClass().getName() : "null") + ")");
+            }
+            System.out.println(":fin");
+            byte kind = returnTypeHint.getKind();
+            int index = returnTypeHint.getIndex();
+            byte reifiedValue = -1;
+            if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM){
+                reifiedValue = (byte) args[
+                    method.getMethod().getParameterCount() + (method.isStatic() ? 0 : 1)
+                    + index]; //TODO, check this
+            } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM){
+                //TODO
+            } else {
+                throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in pushResult of inoke" + toString());
+            }
+            if (reifiedValue == TypeHints.TypeA.BYTE){
+                EspressoFrame.putInt(frame, resultAt, (byte) result);
+            } else if (reifiedValue == TypeHints.TypeA.CHAR){
+                EspressoFrame.putInt(frame, resultAt, (char) result);
+            } else if (reifiedValue == TypeHints.TypeA.DOUBLE) {
+                EspressoFrame.putDouble(frame, resultAt, (double) result);
+            } else if (reifiedValue == TypeHints.TypeA.FLOAT) {
+                EspressoFrame.putFloat(frame, resultAt, (float) result);
+            } else if (reifiedValue == TypeHints.TypeA.INT){
+                EspressoFrame.putInt(frame, resultAt, (int) result);
+            } else if (reifiedValue == TypeHints.TypeA.LONG) {
+                EspressoFrame.putLong(frame, resultAt, (long) result);
+            } else if (reifiedValue == TypeHints.TypeA.SHORT){
+                EspressoFrame.putInt(frame, resultAt, (short) result);
+            } else if (reifiedValue == TypeHints.TypeA.BOOLEAN){
+                EspressoFrame.putInt(frame, resultAt, (boolean) result ? 1 : 0);
+            } else {
+                EspressoFrame.putObject(frame, resultAt, (StaticObject) result);
+            }
+            return stackEffect;
         }
-        EspressoFrame.putKind(frame, resultAt, result, method.getMethod().getReturnKind());
-        return stackEffect;
     }
 
     @Override

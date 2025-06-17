@@ -22,7 +22,10 @@
  */
 package com.oracle.truffle.espresso.nodes.quick.invoke;
 
+import java.util.Arrays;
+
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.impl.Method;
 import com.oracle.truffle.espresso.nodes.bytecodes.InvokeVirtual;
 import com.oracle.truffle.espresso.nodes.bytecodes.InvokeVirtualNodeGen;
@@ -32,16 +35,28 @@ public final class InvokeVirtualQuickNode extends InvokeQuickNode {
 
     @Child InvokeVirtual.WithoutNullCheck invokeVirtual;
 
+    private final Method m;
+
     public InvokeVirtualQuickNode(Method method, int top, int curBCI) {
         super(method, top, curBCI);
         assert !method.isStatic();
         this.invokeVirtual = insert(InvokeVirtualNodeGen.WithoutNullCheckNodeGen.create(method));
+        this.m = method;
+    }
+
+    public InvokeVirtualQuickNode(Method method, int top, int curBCI, 
+        boolean reifiedEnabled, int startReifiedTypes) {
+        super(method, top, curBCI, reifiedEnabled, startReifiedTypes);
+        assert !method.isStatic();
+        this.invokeVirtual = insert(InvokeVirtualNodeGen.WithoutNullCheckNodeGen.create(method));
+        this.m = method;
     }
 
     @Override
     public int execute(VirtualFrame frame, boolean isContinuationResume) {
         Object[] args = getArguments(frame);
         nullCheck((StaticObject) args[0]);
-        return pushResult(frame, invokeVirtual.execute(args));
+        Object exeRes = invokeVirtual.execute(args);
+        return pushResult(frame, exeRes);
     }
 }
