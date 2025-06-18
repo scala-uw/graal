@@ -354,18 +354,14 @@ public final class EspressoFrame {
 
     public static Object[] popArguments(VirtualFrame frame, int top, boolean hasReceiver, final Symbol<Type>[] signature, int typeParamsCnt){
         return popArguments(frame, top, hasReceiver, signature, typeParamsCnt, 
-                            false, new TypeHints.TypeB[SignatureSymbols.parameterCount(signature)], -1);
+                            false, new TypeHints.TypeB[SignatureSymbols.parameterCount(signature)]);
     }
 
     @ExplodeLoop
     public static Object[] popArguments(VirtualFrame frame, int top, boolean hasReceiver, final Symbol<Type>[] signature, int typeParamsCnt, 
-                                        boolean reifiedEnabled, TypeHints.TypeB[] parameterHints, int startReifiedTypes) {
+                                        boolean reifiedEnabled, TypeHints.TypeB[] parameterHints) {
         int argCount = SignatureSymbols.parameterCount(signature);
         assert parameterHints.length == argCount : "Parameter hints length does not match the number of parameters in the signature";
-        if (reifiedEnabled){
-            System.out.println("popArguments: reifiedEnabled = true, startReifiedTypes = " + startReifiedTypes);
-            System.out.println("param hints: " + Arrays.toString(parameterHints));  
-        }
         int extraParam = hasReceiver ? 1 : 0;
         final Object[] args = new Object[argCount + extraParam + typeParamsCnt];
 
@@ -374,7 +370,6 @@ public final class EspressoFrame {
         CompilerAsserts.partialEvaluationConstant(hasReceiver);
         CompilerAsserts.partialEvaluationConstant(typeParamsCnt);
         CompilerAsserts.partialEvaluationConstant(parameterHints);
-        CompilerAsserts.partialEvaluationConstant(startReifiedTypes);
 
         int argAt = top - 1;
         for (int i = typeParamsCnt - 1; i >= 0; --i) {
@@ -405,8 +400,6 @@ public final class EspressoFrame {
                             byte reifiedValue = -1;
                             if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM){
                                 reifiedValue = (byte) args[argCount + extraParam + index]; //TODO, CHECK THIS!
-                                System.out.println(Arrays.toString(frame.getArguments()));
-                                System.out.println("in poparguments: reifiedValue: " + reifiedValue + ", index: " + index + ", kind: " + kind);
                             } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM){
                                 //TODO
                             } else {

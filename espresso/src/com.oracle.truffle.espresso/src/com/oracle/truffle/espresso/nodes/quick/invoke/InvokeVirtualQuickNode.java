@@ -22,10 +22,7 @@
  */
 package com.oracle.truffle.espresso.nodes.quick.invoke;
 
-import java.util.Arrays;
-
 import com.oracle.truffle.api.frame.VirtualFrame;
-import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.impl.Method;
 import com.oracle.truffle.espresso.nodes.bytecodes.InvokeVirtual;
 import com.oracle.truffle.espresso.nodes.bytecodes.InvokeVirtualNodeGen;
@@ -45,8 +42,8 @@ public final class InvokeVirtualQuickNode extends InvokeQuickNode {
     }
 
     public InvokeVirtualQuickNode(Method method, int top, int curBCI, 
-        boolean reifiedEnabled, int startReifiedTypes) {
-        super(method, top, curBCI, reifiedEnabled, startReifiedTypes);
+        boolean reifiedEnabled) {
+        super(method, top, curBCI, reifiedEnabled);
         assert !method.isStatic();
         this.invokeVirtual = insert(InvokeVirtualNodeGen.WithoutNullCheckNodeGen.create(method));
         this.m = method;

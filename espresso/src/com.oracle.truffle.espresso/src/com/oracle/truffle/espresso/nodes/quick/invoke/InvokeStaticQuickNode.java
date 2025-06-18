@@ -55,13 +55,6 @@ public final class InvokeStaticQuickNode extends InvokeQuickNode {
         }
         
         Object[] args = getArguments(frame);
-        if (method.getName().toString().contains("unboxToInt")){
-            System.out.println("InvokeStaticQuickNode.getArguments: ");
-            for (int i = 0; i < args.length; i++) {
-                System.out.print("," + i + ": " + args[i] + " (" + (args[i] != null ? args[i].getClass().getName() : "null") + ")");
-            }
-            System.out.println(":fin");
-        }
         return pushResult(frame, invokeStatic.execute(args));
     }
 

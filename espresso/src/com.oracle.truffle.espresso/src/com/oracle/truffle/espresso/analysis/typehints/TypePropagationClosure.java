@@ -64,7 +64,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
     private final int maxStack;
     private final InvokeReturnTypeAttribute.Entry[] invokeReturnTypeAttributes;
 
-    private final boolean debug = true;
+    private final boolean debug = false;
 
     public TypePropagationClosure(
                     EspressoContext ctx,
