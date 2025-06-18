@@ -390,6 +390,7 @@ public final class EspressoFrame {
                 case 'D' : args[i + extraParam] = popDouble(frame, argAt); --argAt; break;
                 case '[' : // fall through
                 case 'L' : 
+                    // box to StaticObject
                     if (reifiedEnabled){
                         TypeHints.TypeB curArgHint = parameterHints[i];
                         if (curArgHint == null || curArgHint.isNoHint()){

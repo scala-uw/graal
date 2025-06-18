@@ -84,7 +84,7 @@ public class TypeHints {
         public static final byte METHOD_TYPE_PARAM = 'M';
         public static final byte ARR_CLASS_TYPE_PARAM = 'k';
         public static final byte ARR_METHOD_TYPE_PARAM = 'm';
-        public static final byte REFERENCE = 'L';
+        // public static final byte REFERENCE = 'L';
 
         // private final byte isArray;
         private final byte kind;

@@ -558,6 +558,10 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     private void initArguments(VirtualFrame frame) {
         Object[] arguments = frame.getArguments();
 
+        if (getMethod().getName().toString().equals("identity")){
+            System.out.println("initArguments: " + getMethod().getName() + ", args: " + Arrays.toString(arguments));
+        }
+
         boolean hasReceiver = !getMethod().isStatic();
         int receiverSlot = hasReceiver ? 1 : 0;
         int curSlot = 0;
@@ -598,7 +602,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         } else {
                             byte kind = typeB.getKind();
                             int index = typeB.getIndex();
-                            byte reifiedValue = -1;
+                            byte reifiedValue = TypeHints.TypeA.REFERENCE;
                             if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM){
                                 reifiedValue = (byte) arguments[argCount + receiverSlot + index]; //TODO, CHECK THIS!!
                             } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM){
@@ -607,24 +611,24 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                 CompilerDirectives.transferToInterpreterAndInvalidate();
                                 throw EspressoError.shouldNotReachHere("Unexpected type hint kind at BytecodeNode.initArguments: " + kind);
                             }
+                            StaticObject argument = (StaticObject) arguments[i + receiverSlot];
                             if (reifiedValue == TypeHints.TypeA.BYTE){
-                                setLocalInt(frame, curSlot, ((byte) arguments[i + receiverSlot])); break;
+                                setLocalInt(frame, curSlot, getContext().getMeta().unboxByte(argument)); break;
                             } else if (reifiedValue == TypeHints.TypeA.CHAR){
-                                setLocalInt(frame, curSlot, ((char) arguments[i + receiverSlot])); break;
+                                setLocalInt(frame, curSlot, getContext().getMeta().unboxCharacter(argument)); break;
                             } else if (reifiedValue == TypeHints.TypeA.DOUBLE){
-                                setLocalDouble(frame, curSlot, ((double) arguments[i + receiverSlot])); break;
+                                setLocalDouble(frame, curSlot, getContext().getMeta().unboxDouble(argument)); break;
                             } else if (reifiedValue == TypeHints.TypeA.FLOAT){
-                                setLocalFloat(frame, curSlot, ((float) arguments[i + receiverSlot])); break;
+                                setLocalFloat(frame, curSlot, getContext().getMeta().unboxFloat(argument)); break;
                             } else if (reifiedValue == TypeHints.TypeA.INT){
-                                setLocalInt(frame, curSlot, ((int) arguments[i + receiverSlot])); break;
+                                setLocalInt(frame, curSlot, getContext().getMeta().unboxInteger(argument)); break;
                             } else if (reifiedValue == TypeHints.TypeA.LONG){
-                                setLocalLong(frame, curSlot, ((long) arguments[i + receiverSlot])); break;
+                                setLocalLong(frame, curSlot, getContext().getMeta().unboxLong(argument)); break;
                             } else if (reifiedValue == TypeHints.TypeA.SHORT){
-                                setLocalInt(frame, curSlot, ((short) arguments[i + receiverSlot])); break;
+                                setLocalInt(frame, curSlot, getContext().getMeta().unboxShort(argument)); break;
                             } else if (reifiedValue == TypeHints.TypeA.BOOLEAN){
-                                setLocalInt(frame, curSlot, ((boolean) arguments[i + receiverSlot]) ? 1 : 0); break;
+                                setLocalInt(frame, curSlot, getContext().getMeta().unboxBoolean(argument) ? 1 : 0); break;
                             } else {
-                                StaticObject argument = (StaticObject) arguments[i + receiverSlot];
                                 setLocalObject(frame, curSlot, argument);
                                 checkNoForeignObjectAssumption(argument);
                                 break;
@@ -1028,20 +1032,20 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                             } else {
                                 byte kind = typeB.getKind();
                                 int index = typeB.getIndex();
-                                byte reifiedValue = -1;
+                                CompilerAsserts.partialEvaluationConstant(kind);
+                                CompilerAsserts.partialEvaluationConstant(index);
+                                byte reifiedValue = TypeHints.TypeA.REFERENCE;
                                 if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
                                     reifiedValue = getReifiedTypeAt(frame, startReifiedTypes, index);
                                 } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
                                     // TODO
-                                } else if (kind == TypeHints.TypeB.REFERENCE) {
-                                    
                                 } else {
                                     throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in ALOAD at BCI " + curBCI);
                                 }
                                 if (reifiedValue == TypeHints.TypeA.BYTE){
-                                    putInt(frame, top, getLocalInt(frame, aloadIndex));
+                                    putInt(frame, top, (byte) getLocalInt(frame, aloadIndex));
                                 } else if (reifiedValue == TypeHints.TypeA.CHAR){
-                                    putInt(frame, top, getLocalInt(frame, aloadIndex));
+                                    putInt(frame, top, (char) getLocalInt(frame, aloadIndex));
                                 } else if (reifiedValue == TypeHints.TypeA.DOUBLE) {
                                     putDouble(frame, top, getLocalDouble(frame, aloadIndex));
                                 } else if (reifiedValue == TypeHints.TypeA.FLOAT) {
@@ -1051,7 +1055,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                 } else if (reifiedValue == TypeHints.TypeA.LONG) {
                                     putLong(frame, top, getLocalLong(frame, aloadIndex));
                                 } else if (reifiedValue == TypeHints.TypeA.SHORT){
-                                    putInt(frame, top, getLocalInt(frame, aloadIndex));
+                                    putInt(frame, top, (short) getLocalInt(frame, aloadIndex));
                                 } else if (reifiedValue == TypeHints.TypeA.BOOLEAN){
                                     putInt(frame, top, getLocalInt(frame, aloadIndex));
                                 } else {
@@ -1146,20 +1150,20 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                             } else {
                                 byte kind = typeB.getKind();
                                 int index = typeB.getIndex();
-                                byte reifiedValue = -1;
+                                CompilerAsserts.partialEvaluationConstant(kind);
+                                CompilerAsserts.partialEvaluationConstant(index);
+                                byte reifiedValue = TypeHints.TypeA.REFERENCE;
                                 if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
                                     reifiedValue = getReifiedTypeAt(frame, startReifiedTypes, index);
                                 } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
-                                    // TODO
-                                } else if (kind == TypeHints.TypeB.REFERENCE) {
-                                    
+                                    // TODO  
                                 } else {
                                     throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in ALOAD at BCI " + curBCI);
                                 }
                                 if (reifiedValue == TypeHints.TypeA.BYTE){
-                                    setLocalInt(frame, astoreIndex, popInt(frame, top - 1));
+                                    setLocalInt(frame, astoreIndex, (byte) popInt(frame, top - 1));
                                 } else if (reifiedValue == TypeHints.TypeA.CHAR){
-                                    setLocalInt(frame, astoreIndex, popInt(frame, top - 1));
+                                    setLocalInt(frame, astoreIndex, (char) popInt(frame, top - 1));
                                 } else if (reifiedValue == TypeHints.TypeA.DOUBLE) {
                                     setLocalDouble(frame, astoreIndex, popDouble(frame, top - 1));
                                 } else if (reifiedValue == TypeHints.TypeA.FLOAT) {
@@ -1169,7 +1173,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                 } else if (reifiedValue == TypeHints.TypeA.LONG) {
                                     setLocalLong(frame, astoreIndex, popLong(frame, top - 1));
                                 } else if (reifiedValue == TypeHints.TypeA.SHORT){
-                                    setLocalInt(frame, astoreIndex, popInt(frame, top - 1));
+                                    setLocalInt(frame, astoreIndex, (short) popInt(frame, top - 1));
                                 } else if (reifiedValue == TypeHints.TypeA.BOOLEAN){
                                     setLocalInt(frame, astoreIndex, popInt(frame, top - 1));
                                 } else {
@@ -1564,9 +1568,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                 if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
                                     returnTypeReifiedValue = getReifiedTypeAt(frame, startReifiedTypes, index);
                                 } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
-                                    // TODO
-                                } else if (kind == TypeHints.TypeB.REFERENCE) {
-                                    
+                                    // TODO 
                                 } else {
                                     throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in ALOAD at BCI " + curBCI);
                                 }
@@ -1630,6 +1632,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     case INVOKESPECIAL: // fall through
                     case INVOKESTATIC:  // fall through
                     case INVOKEINTERFACE:
+                        //box to StaticObject here using typePropagationOperands, thus no boxing needed at popArguments
                         if (typePropagationOperands != null && reifiedEnabled){
                             int[] argumentReifiedTypeValues = new int[typePropagationOperands.length];
                             for (int i = 0; i < typePropagationOperands.length; i++) {
@@ -1643,8 +1646,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                         argumentReifiedTypeValues[i] = getReifiedTypeAt(frame, startReifiedTypes, index);
                                     } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
                                         // TODO
-                                    } else if (kind == TypeHints.TypeB.REFERENCE) {
-                                        argumentReifiedTypeValues[i] = TypeHints.TypeA.REFERENCE;
                                     } else {
                                         throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in ALOAD at BCI " + curBCI);
                                     }
