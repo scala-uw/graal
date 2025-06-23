@@ -926,6 +926,46 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                             ", top: " + top + ", statementIndex: " + statementIndex);
                 }
 
+                CompilerAsserts.partialEvaluationConstant(typeAnalysisRes[curBCI]);
+                if (typeAnalysisRes[curBCI] != null) {
+                    CompilerAsserts.partialEvaluationConstant(typeAnalysisRes[curBCI].isInvoke);
+                    if (typeAnalysisRes[curBCI].isInvoke) {
+                        TypeHints.TypeB[] typeBList = typeAnalysisRes[curBCI].operands;
+                        CompilerAsserts.partialEvaluationConstant(typeBList.length);
+                        for (int i = 0; i < typeBList.length; ++i) {
+                            int position = top - (typeBList.length - i);
+                            byte reifiedTypeValue = TypeHints.TypeB.resolveReifiedType(typeBList[i], frame, startReifiedTypes);
+                            switch (reifiedTypeValue) {
+                                case TypeHints.TypeA.BYTE:
+                                    putObject(frame, position, getContext().getMeta().boxByte((byte) popInt(frame, position)));
+                                    break;
+                                case TypeHints.TypeA.CHAR:
+                                    putObject(frame, position, getContext().getMeta().boxCharacter((char) popInt(frame, position)));
+                                    break;
+                                case TypeHints.TypeA.DOUBLE:
+                                    putObject(frame, position, getContext().getMeta().boxDouble(popDouble(frame, position)));
+                                    break;
+                                case TypeHints.TypeA.FLOAT:
+                                    putObject(frame, position, getContext().getMeta().boxFloat(popFloat(frame, position)));
+                                    break;
+                                case TypeHints.TypeA.INT:
+                                    putObject(frame, position, getContext().getMeta().boxInteger(popInt(frame, position)));
+                                    break;
+                                case TypeHints.TypeA.LONG:
+                                    putObject(frame, position, getContext().getMeta().boxLong(popLong(frame, position)));
+                                    break;
+                                case TypeHints.TypeA.SHORT:
+                                    putObject(frame, position, getContext().getMeta().boxShort((short) popInt(frame, position)));
+                                    break;
+                                case TypeHints.TypeA.BOOLEAN:
+                                    putObject(frame, position, getContext().getMeta().boxBoolean(popInt(frame, position) != 0));
+                                    break;
+                                default:
+                            }
+                        }
+                    }
+                }
+
                 if (instructionTypeArgHints[curBCI] != null) {
                     CompilerAsserts.partialEvaluationConstant(instructionTypeArgHints[curBCI].length);
                     for (TypeHints.TypeA typeArg : instructionTypeArgHints[curBCI]) {
@@ -1025,51 +1065,40 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         if (typePropagationOperands != null && reifiedEnabled) {
                             assert typePropagationOperands.length == 1 : "Expected exactly one operand for ALOAD";
                             TypeHints.TypeB typeB = typePropagationOperands[0];
-                            if (typeB == null) {
-                                putObject(frame, top, getLocalObject(frame, aloadIndex));
-                                livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
-                                break;
-                            } else {
-                                byte kind = typeB.getKind();
-                                int index = typeB.getIndex();
-                                CompilerAsserts.partialEvaluationConstant(kind);
-                                CompilerAsserts.partialEvaluationConstant(index);
-                                byte reifiedValue = TypeHints.TypeA.REFERENCE;
-                                if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
-                                    reifiedValue = getReifiedTypeAt(frame, startReifiedTypes, index);
-                                } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
-                                    // TODO
-                                } else {
-                                    throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in ALOAD at BCI " + curBCI);
-                                }
-                                if (reifiedValue == TypeHints.TypeA.BYTE){
+                            byte reifiedTypeValue = TypeHints.TypeB.resolveReifiedType(typeB, frame, startReifiedTypes);
+                            switch (reifiedTypeValue) {
+                                case TypeHints.TypeA.BYTE:
                                     putInt(frame, top, (byte) getLocalInt(frame, aloadIndex));
-                                } else if (reifiedValue == TypeHints.TypeA.CHAR){
+                                    break;
+                                case TypeHints.TypeA.CHAR:
                                     putInt(frame, top, (char) getLocalInt(frame, aloadIndex));
-                                } else if (reifiedValue == TypeHints.TypeA.DOUBLE) {
+                                    break;
+                                case TypeHints.TypeA.DOUBLE:
                                     putDouble(frame, top, getLocalDouble(frame, aloadIndex));
-                                } else if (reifiedValue == TypeHints.TypeA.FLOAT) {
+                                    break;
+                                case TypeHints.TypeA.FLOAT:
                                     putFloat(frame, top, getLocalFloat(frame, aloadIndex));
-                                } else if (reifiedValue == TypeHints.TypeA.INT){
+                                    break;
+                                case TypeHints.TypeA.INT:
                                     putInt(frame, top, getLocalInt(frame, aloadIndex));
-                                } else if (reifiedValue == TypeHints.TypeA.LONG) {
+                                    break;
+                                case TypeHints.TypeA.LONG:
                                     putLong(frame, top, getLocalLong(frame, aloadIndex));
-                                } else if (reifiedValue == TypeHints.TypeA.SHORT){
+                                    break;
+                                case TypeHints.TypeA.SHORT:
                                     putInt(frame, top, (short) getLocalInt(frame, aloadIndex));
-                                } else if (reifiedValue == TypeHints.TypeA.BOOLEAN){
+                                    break;
+                                case TypeHints.TypeA.BOOLEAN:
                                     putInt(frame, top, getLocalInt(frame, aloadIndex));
-                                } else {
+                                    break;
+                                default:
                                     putObject(frame, top, getLocalObject(frame, aloadIndex));
-                                }
-                                // putObject(frame, top, getLocalObject(frame, aloadIndex));
-                                livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
-                                break;
                             }
                         } else {
                             putObject(frame, top, getLocalObject(frame, aloadIndex));
-                            livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
-                            break;
                         }
+                        livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
+                        break;
                     case ILOAD_0: // fall through
                     case ILOAD_1: // fall through
                     case ILOAD_2: // fall through
@@ -1143,50 +1172,40 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         if (typePropagationOperands != null && reifiedEnabled){
                             assert typePropagationOperands.length == 1 : "Expected exactly one operand for ASTORE";
                             TypeHints.TypeB typeB = typePropagationOperands[0];
-                            if (typeB == null) {
-                                setLocalObjectOrReturnAddress(frame, astoreIndex, popReturnAddressOrObject(frame, top - 1));
-                                livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
-                                break;
-                            } else {
-                                byte kind = typeB.getKind();
-                                int index = typeB.getIndex();
-                                CompilerAsserts.partialEvaluationConstant(kind);
-                                CompilerAsserts.partialEvaluationConstant(index);
-                                byte reifiedValue = TypeHints.TypeA.REFERENCE;
-                                if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
-                                    reifiedValue = getReifiedTypeAt(frame, startReifiedTypes, index);
-                                } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
-                                    // TODO  
-                                } else {
-                                    throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in ALOAD at BCI " + curBCI);
-                                }
-                                if (reifiedValue == TypeHints.TypeA.BYTE){
+                            byte reifiedTypeValue = TypeHints.TypeB.resolveReifiedType(typeB, frame, startReifiedTypes);
+                            switch (reifiedTypeValue) {
+                                case TypeHints.TypeA.BYTE:
                                     setLocalInt(frame, astoreIndex, (byte) popInt(frame, top - 1));
-                                } else if (reifiedValue == TypeHints.TypeA.CHAR){
+                                    break;
+                                case TypeHints.TypeA.CHAR:
                                     setLocalInt(frame, astoreIndex, (char) popInt(frame, top - 1));
-                                } else if (reifiedValue == TypeHints.TypeA.DOUBLE) {
+                                    break;
+                                case TypeHints.TypeA.DOUBLE:
                                     setLocalDouble(frame, astoreIndex, popDouble(frame, top - 1));
-                                } else if (reifiedValue == TypeHints.TypeA.FLOAT) {
+                                    break;
+                                case TypeHints.TypeA.FLOAT:
                                     setLocalFloat(frame, astoreIndex, popFloat(frame, top - 1));
-                                } else if (reifiedValue == TypeHints.TypeA.INT){
+                                    break;
+                                case TypeHints.TypeA.INT:
                                     setLocalInt(frame, astoreIndex, popInt(frame, top - 1));
-                                } else if (reifiedValue == TypeHints.TypeA.LONG) {
+                                    break;
+                                case TypeHints.TypeA.LONG:
                                     setLocalLong(frame, astoreIndex, popLong(frame, top - 1));
-                                } else if (reifiedValue == TypeHints.TypeA.SHORT){
+                                    break;
+                                case TypeHints.TypeA.SHORT:
                                     setLocalInt(frame, astoreIndex, (short) popInt(frame, top - 1));
-                                } else if (reifiedValue == TypeHints.TypeA.BOOLEAN){
+                                    break;
+                                case TypeHints.TypeA.BOOLEAN:
                                     setLocalInt(frame, astoreIndex, popInt(frame, top - 1));
-                                } else {
+                                    break;
+                                default:
                                     setLocalObjectOrReturnAddress(frame, astoreIndex, popReturnAddressOrObject(frame, top - 1));
-                                }
-                                livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
-                            break;
                             }
                         } else {
                             setLocalObjectOrReturnAddress(frame, astoreIndex, popReturnAddressOrObject(frame, top - 1));
-                            livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
-                            break;
                         }
+                        livenessAnalysis.performPostBCI(frame, curBCI, skipLivenessActions);
+                        break;
                     case ISTORE_0: // fall through
                     case ISTORE_1: // fall through
                     case ISTORE_2: // fall through

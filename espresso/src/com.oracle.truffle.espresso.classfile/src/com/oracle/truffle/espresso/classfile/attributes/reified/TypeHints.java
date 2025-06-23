@@ -2,6 +2,9 @@ package com.oracle.truffle.espresso.classfile.attributes.reified;
 
 import java.util.Objects;
 
+import com.oracle.truffle.api.CompilerAsserts;
+import com.oracle.truffle.api.frame.VirtualFrame;
+
 public class TypeHints {
     public static class TypeA {
         public static final byte BYTE = 'B';
@@ -110,6 +113,21 @@ public class TypeHints {
 
         public boolean isNoHint() {
             return this == NO_HINT || (this.kind == 0 && this.index == -1);
+        }
+
+        public static byte resolveReifiedType(TypeB typeBInstance, VirtualFrame frame, int startMethodTypeParams) {
+            if (typeBInstance == null) {
+                return TypeA.REFERENCE;
+            }
+            CompilerAsserts.partialEvaluationConstant(typeBInstance.kind);
+            CompilerAsserts.partialEvaluationConstant(typeBInstance.index);
+            if (typeBInstance.kind == METHOD_TYPE_PARAM) {
+                return (byte) frame.getIntStatic(startMethodTypeParams + typeBInstance.index);
+            } else if (typeBInstance.kind == CLASS_TYPE_PARAM) {
+                return TypeA.REFERENCE; // TODO: class type params
+            } else {
+                return TypeA.REFERENCE;
+            }
         }
 
         @Override

@@ -7,10 +7,8 @@ import com.oracle.truffle.espresso.analysis.AnalysisProcessor;
 import com.oracle.truffle.espresso.analysis.BlockIterator;
 import com.oracle.truffle.espresso.analysis.BlockIteratorClosure;
 import com.oracle.truffle.espresso.analysis.graph.LinkedBlock;
-import com.oracle.truffle.espresso.classfile.attributes.reified.InstructionTypeArgumentsAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.InvokeReturnTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodParameterTypeAttribute;
-import com.oracle.truffle.espresso.classfile.attributes.reified.MethodReturnTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.classfile.bytecode.BytecodeStream;
 import com.oracle.truffle.espresso.classfile.bytecode.Bytecodes;
@@ -240,7 +238,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                         getConstantPool().methodAt(cpi), 
                         getConstantPool(),
                         getDeclaringKlass()
-                        );
+                    );
                     CallSiteType callSiteType = SiteTypes.callSiteFromOpCode(opcode);
                     ResolvedCall<Klass, Method, Field> resolvedCall = 
                         EspressoLinkResolver.resolveCallSiteOrThrow(ctx, getDeclaringKlass(), resolutionSeed, callSiteType, symbolicRef);
@@ -258,7 +256,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                             argsHint[i] = state.stack[--state.stackTop];
                         }
                     }
-                    this.resAtBCI[bci] = new TypeAnalysisResult(argsHint);
+                    this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, true);
                     if (!resolvedMethod.isStatic()) {
                         assert state.stack[state.stackTop - 1] == null; // We should ban calling methods of Any (e.g. hashCode) on a value typed T
                         --state.stackTop;
