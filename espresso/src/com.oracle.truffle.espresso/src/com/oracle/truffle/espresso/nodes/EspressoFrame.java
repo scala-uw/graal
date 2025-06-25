@@ -224,6 +224,16 @@ public final class EspressoFrame {
         frame.setDoubleStatic(slot + 1, value);
     }
 
+    public static void putDouble(Frame frame, int slot, double value, boolean reified) {
+        if (reified) {
+            assert slot >= 0;
+            frame.setDoubleStatic(slot, value);
+        }
+        else{
+            putDouble(frame, slot, value);
+        }
+    }
+
     private static void clearReference(Frame frame, int slot) {
         assert slot >= 0;
         frame.clearObjectStatic(slot);
@@ -390,47 +400,48 @@ public final class EspressoFrame {
                 case 'D' : args[i + extraParam] = popDouble(frame, argAt); --argAt; break;
                 case '[' : // fall through
                 case 'L' : 
+                    args[i + extraParam] = popObject(frame, argAt); break;
                     // box to StaticObject
-                    if (reifiedEnabled){
-                        TypeHints.TypeB curArgHint = parameterHints[i];
-                        if (curArgHint == null || curArgHint.isNoHint()){
-                            args[i + extraParam] = popObject(frame, argAt);
-                        } else {
-                            byte kind = curArgHint.getKind();
-                            int index = curArgHint.getIndex();
-                            byte reifiedValue = -1;
-                            if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM){
-                                reifiedValue = (byte) args[argCount + extraParam + index]; //TODO, CHECK THIS!
-                            } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM){
-                                //TODO
-                            } else {
-                                CompilerDirectives.transferToInterpreterAndInvalidate();
-                                throw EspressoError.shouldNotReachHere("Unexpected reified type kind: " + kind);
-                            }
-                            if (reifiedValue == TypeHints.TypeA.BYTE){
-                                args[i + extraParam] = (byte) popInt(frame, argAt);
-                            } else if (reifiedValue == TypeHints.TypeA.CHAR){
-                                args[i + extraParam] = (char) popInt(frame, argAt);
-                            } else if (reifiedValue == TypeHints.TypeA.DOUBLE){
-                                args[i + extraParam] = popDouble(frame, argAt);
-                            } else if (reifiedValue == TypeHints.TypeA.FLOAT){
-                                args[i + extraParam] = popFloat(frame, argAt);
-                            } else if (reifiedValue == TypeHints.TypeA.INT){
-                                args[i + extraParam] = popInt(frame, argAt);
-                            } else if (reifiedValue == TypeHints.TypeA.LONG){
-                                args[i + extraParam] = popLong(frame, argAt);
-                            } else if (reifiedValue == TypeHints.TypeA.SHORT){
-                                args[i + extraParam] = (short) popInt(frame, argAt);
-                            } else if (reifiedValue == TypeHints.TypeA.BOOLEAN){
-                                args[i + extraParam] = (popInt(frame, argAt) != 0);
-                            } else {
-                                args[i + extraParam] = popObject(frame, argAt);
-                            }
-                        }
-                    } else {
-                        args[i + extraParam] = popObject(frame, argAt);
-                    }
-                    break;
+                    // if (reifiedEnabled){
+                    //     TypeHints.TypeB curArgHint = parameterHints[i];
+                    //     if (curArgHint == null || curArgHint.isNoHint()){
+                    //         args[i + extraParam] = popObject(frame, argAt);
+                    //     } else {
+                    //         byte kind = curArgHint.getKind();
+                    //         int index = curArgHint.getIndex();
+                    //         byte reifiedValue = -1;
+                    //         if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM){
+                    //             reifiedValue = (byte) args[argCount + extraParam + index]; //TODO, CHECK THIS!
+                    //         } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM){
+                    //             //TODO
+                    //         } else {
+                    //             CompilerDirectives.transferToInterpreterAndInvalidate();
+                    //             throw EspressoError.shouldNotReachHere("Unexpected reified type kind: " + kind);
+                    //         }
+                    //         if (reifiedValue == TypeHints.TypeA.BYTE){
+                    //             args[i + extraParam] = (byte) popInt(frame, argAt);
+                    //         } else if (reifiedValue == TypeHints.TypeA.CHAR){
+                    //             args[i + extraParam] = (char) popInt(frame, argAt);
+                    //         } else if (reifiedValue == TypeHints.TypeA.DOUBLE){
+                    //             args[i + extraParam] = popDouble(frame, argAt);
+                    //         } else if (reifiedValue == TypeHints.TypeA.FLOAT){
+                    //             args[i + extraParam] = popFloat(frame, argAt);
+                    //         } else if (reifiedValue == TypeHints.TypeA.INT){
+                    //             args[i + extraParam] = popInt(frame, argAt);
+                    //         } else if (reifiedValue == TypeHints.TypeA.LONG){
+                    //             args[i + extraParam] = popLong(frame, argAt);
+                    //         } else if (reifiedValue == TypeHints.TypeA.SHORT){
+                    //             args[i + extraParam] = (short) popInt(frame, argAt);
+                    //         } else if (reifiedValue == TypeHints.TypeA.BOOLEAN){
+                    //             args[i + extraParam] = (popInt(frame, argAt) != 0);
+                    //         } else {
+                    //             args[i + extraParam] = popObject(frame, argAt);
+                    //         }
+                    //     }
+                    // } else {
+                    //     args[i + extraParam] = popObject(frame, argAt);
+                    // }
+                    // break;
                 default  :
                     CompilerDirectives.transferToInterpreterAndInvalidate();
                     throw EspressoError.shouldNotReachHere();

@@ -61,6 +61,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
     private final int maxLocals;
     private final int maxStack;
     private final InvokeReturnTypeAttribute.Entry[] invokeReturnTypeAttributes;
+    private final int codeLength;
 
     private final boolean debug = false;
 
@@ -72,7 +73,8 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     int maxStack,
                     int totalBlocks) {
         this.ctx = ctx;
-        this.resAtBCI = new TypeAnalysisResult[codeLength];
+        this.codeLength = codeLength;
+        this.resAtBCI = new TypeAnalysisResult[codeLength + 1];
         this.methodVersion = methodVersion;
         this.maxLocals = maxLocals;
         this.maxStack = maxStack;
@@ -349,6 +351,10 @@ public class TypePropagationClosure extends BlockIteratorClosure{
     }
 
     public TypeAnalysisResult[] getRes() {
+        /*  for a method, BytecodeNode.java adds a RETURN_VALUE opcode
+            at the very end, so we copy the result for RETURN to it
+        */
+        resAtBCI[codeLength] = resAtBCI[codeLength - 1];
         return resAtBCI;
     }
     
