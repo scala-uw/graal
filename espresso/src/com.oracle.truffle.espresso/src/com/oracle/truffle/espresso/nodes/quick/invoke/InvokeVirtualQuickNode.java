@@ -32,21 +32,10 @@ public final class InvokeVirtualQuickNode extends InvokeQuickNode {
 
     @Child InvokeVirtual.WithoutNullCheck invokeVirtual;
 
-    private final Method m;
-
     public InvokeVirtualQuickNode(Method method, int top, int curBCI) {
         super(method, top, curBCI);
         assert !method.isStatic();
         this.invokeVirtual = insert(InvokeVirtualNodeGen.WithoutNullCheckNodeGen.create(method));
-        this.m = method;
-    }
-
-    public InvokeVirtualQuickNode(Method method, int top, int curBCI, 
-        boolean reifiedEnabled) {
-        super(method, top, curBCI, reifiedEnabled);
-        assert !method.isStatic();
-        this.invokeVirtual = insert(InvokeVirtualNodeGen.WithoutNullCheckNodeGen.create(method));
-        this.m = method;
     }
 
     @Override

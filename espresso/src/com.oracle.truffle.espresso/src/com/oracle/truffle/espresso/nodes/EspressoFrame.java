@@ -370,16 +370,9 @@ public final class EspressoFrame {
         return (byte) frame.getIntStatic(startReifiedTypes + n);
     }
 
-    public static Object[] popArguments(VirtualFrame frame, int top, boolean hasReceiver, final Symbol<Type>[] signature, int typeParamsCnt){
-        return popArguments(frame, top, hasReceiver, signature, typeParamsCnt, 
-                            false, new TypeHints.TypeB[SignatureSymbols.parameterCount(signature)]);
-    }
-
     @ExplodeLoop
-    public static Object[] popArguments(VirtualFrame frame, int top, boolean hasReceiver, final Symbol<Type>[] signature, int typeParamsCnt, 
-                                        boolean reifiedEnabled, TypeHints.TypeB[] parameterHints) {
+    public static Object[] popArguments(VirtualFrame frame, int top, boolean hasReceiver, final Symbol<Type>[] signature, int typeParamsCnt) {
         int argCount = SignatureSymbols.parameterCount(signature);
-        assert parameterHints.length == argCount : "Parameter hints length does not match the number of parameters in the signature";
         int extraParam = hasReceiver ? 1 : 0;
         final Object[] args = new Object[argCount + extraParam + typeParamsCnt];
 
@@ -387,8 +380,7 @@ public final class EspressoFrame {
         CompilerAsserts.partialEvaluationConstant(signature);
         CompilerAsserts.partialEvaluationConstant(hasReceiver);
         CompilerAsserts.partialEvaluationConstant(typeParamsCnt);
-        CompilerAsserts.partialEvaluationConstant(parameterHints);
-
+        
         int argAt = top - 1;
         for (int i = typeParamsCnt - 1; i >= 0; --i) {
             args[argCount + extraParam + i] = (byte) popInt(frame, argAt);

@@ -22,16 +22,10 @@
  */
 package com.oracle.truffle.espresso.nodes.quick.invoke;
 
-import java.util.Arrays;
-
 import com.oracle.truffle.api.frame.VirtualFrame;
-import com.oracle.truffle.espresso.classfile.attributes.reified.MethodParameterTypeAttribute;
-import com.oracle.truffle.espresso.classfile.attributes.reified.MethodReturnTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodTypeParameterCountAttribute;
-import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.classfile.descriptors.SignatureSymbols;
 import com.oracle.truffle.espresso.impl.Method;
-import com.oracle.truffle.espresso.meta.EspressoError;
 import com.oracle.truffle.espresso.nodes.EspressoFrame;
 import com.oracle.truffle.espresso.nodes.quick.QuickNode;
 import com.oracle.truffle.espresso.runtime.staticobject.StaticObject;
@@ -49,11 +43,6 @@ public abstract class InvokeQuickNode extends QuickNode {
     // Helps check for no foreign objects
     private final boolean returnsPrimitive;
 
-    private final TypeHints.TypeB[] parameterHints;
-    private final TypeHints.TypeB returnTypeHint;
-
-    private final boolean reifiedEnabled;
-
     public InvokeQuickNode(Method m, int top, int callerBCI) {
         super(top, callerBCI);
         this.method = m.getMethodVersion();
@@ -62,43 +51,6 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.resultAt = top - this.typeArgCnt -(SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.returnsPrimitive = m.getReturnKind().isPrimitive();
-        MethodParameterTypeAttribute methodParameterTypeAttribute = m.getMethodParameterTypeAttribute();
-        if (methodParameterTypeAttribute != null) {
-            this.parameterHints = methodParameterTypeAttribute.getParameterTypes();
-        } else {
-            this.parameterHints = null; // No hints available.
-        }
-        MethodReturnTypeAttribute returnTypeAttribute = m.getMethodReturnTypeAttribute();
-        if (returnTypeAttribute != null) {
-            this.returnTypeHint = returnTypeAttribute.getReturnType();
-        } else {
-            this.returnTypeHint = TypeHints.TypeB.NO_HINT; // No hint available.
-        }
-        this.reifiedEnabled = false;
-    }
-
-    public InvokeQuickNode(Method m, int top, int callerBCI, 
-        boolean reifiedEnabled) {
-        super(top, callerBCI);
-        this.method = m.getMethodVersion();
-        MethodTypeParameterCountAttribute attr = m.getMethodTypeParameterCountAttribute();
-        this.typeArgCnt = (attr != null ? attr.getCount() : 0);
-        this.resultAt = top - this.typeArgCnt -(SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
-        this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
-        this.returnsPrimitive = m.getReturnKind().isPrimitive();
-        MethodParameterTypeAttribute methodParameterTypeAttribute = m.getMethodParameterTypeAttribute();
-        if (methodParameterTypeAttribute != null) {
-            this.parameterHints = methodParameterTypeAttribute.getParameterTypes();
-        } else {
-            this.parameterHints = null; // No hints available.
-        }
-        MethodReturnTypeAttribute returnTypeAttribute = m.getMethodReturnTypeAttribute();
-        if (returnTypeAttribute != null) {
-            this.returnTypeHint = returnTypeAttribute.getReturnType();
-        } else {
-            this.returnTypeHint = TypeHints.TypeB.NO_HINT; // No hint available.
-        }
-        this.reifiedEnabled = reifiedEnabled;
     }
 
     public InvokeQuickNode(Method.MethodVersion version, int top, int callerBCI) {
@@ -110,19 +62,6 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.resultAt = top - this.typeArgCnt - (SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.returnsPrimitive = m.getReturnKind().isPrimitive();
-        MethodParameterTypeAttribute methodParameterTypeAttribute = m.getMethodParameterTypeAttribute();
-        if (methodParameterTypeAttribute != null) {
-            this.parameterHints = methodParameterTypeAttribute.getParameterTypes();
-        } else {
-            this.parameterHints = null; // No hints available.
-        }
-        MethodReturnTypeAttribute returnTypeAttribute = m.getMethodReturnTypeAttribute();
-        if (returnTypeAttribute != null) {
-            this.returnTypeHint = returnTypeAttribute.getReturnType();
-        } else {
-            this.returnTypeHint = TypeHints.TypeB.NO_HINT; // No hint available.
-        }
-        this.reifiedEnabled = false;
     }
 
     public final StaticObject peekReceiver(VirtualFrame frame) {
@@ -144,7 +83,7 @@ public abstract class InvokeQuickNode extends QuickNode {
             return EMPTY_ARGS;
         }
         Object[] res = EspressoFrame.popArguments(frame, top, !method.isStatic(), method.getMethod().getParsedSignature(), 
-                        this.typeArgCnt, this.reifiedEnabled, this.parameterHints);
+                        this.typeArgCnt);
         return res;
     }
 
