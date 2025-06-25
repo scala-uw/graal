@@ -331,9 +331,11 @@ import static com.oracle.truffle.espresso.nodes.EspressoFrame.popDouble;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.popFloat;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.popInt;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.popLong;
+import static com.oracle.truffle.espresso.nodes.EspressoFrame.putReifiedLong;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.popObject;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.popReturnAddressOrObject;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.putDouble;
+import static com.oracle.truffle.espresso.nodes.EspressoFrame.putReifiedDouble;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.putFloat;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.putInt;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.putLong;
@@ -1071,12 +1073,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                     putInt(frame, top, (char) getLocalInt(frame, aloadIndex));
                                     break;
                                 case TypeHints.TypeA.DOUBLE:
-                                    if (methodVersion.getName().toString().equals("test2")){
-                                        System.out.println("ALOAD loading: double " + getLocalDouble(frame, aloadIndex));
-                                        System.out.println("ALOAD loading: obj " + 
-                                            (getLocalObject(frame, aloadIndex) == null ? "null" : getLocalObject(frame, aloadIndex).toVerboseString()));
-                                    }
-                                    putDouble(frame, top, getLocalDouble(frame, aloadIndex), true); //TODO SHOULD CHECK THIS
+                                    // double should take only one slot here
+                                    putReifiedDouble(frame, top, getLocalDouble(frame, aloadIndex));
                                     break;
                                 case TypeHints.TypeA.FLOAT:
                                     putFloat(frame, top, getLocalFloat(frame, aloadIndex));
@@ -1085,7 +1083,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                     putInt(frame, top, getLocalInt(frame, aloadIndex));
                                     break;
                                 case TypeHints.TypeA.LONG:
-                                    putLong(frame, top, getLocalLong(frame, aloadIndex));
+                                    // long should take only one slot here
+                                    putReifiedLong(frame, top, getLocalLong(frame, aloadIndex));
                                     break;
                                 case TypeHints.TypeA.SHORT:
                                     putInt(frame, top, (short) getLocalInt(frame, aloadIndex));
@@ -1706,7 +1705,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                     putInt(frame, returnPosition, getContext().getMeta().unboxCharacter(returnObject));
                                     break;
                                 case TypeHints.TypeA.DOUBLE:
-                                    putDouble(frame, returnPosition, getContext().getMeta().unboxDouble(returnObject));
+                                    putReifiedDouble(frame, returnPosition, getContext().getMeta().unboxDouble(returnObject));
                                     break;
                                 case TypeHints.TypeA.FLOAT:
                                     putFloat(frame, returnPosition, getContext().getMeta().unboxFloat(returnObject));
@@ -1715,7 +1714,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                     putInt(frame, returnPosition, getContext().getMeta().unboxInteger(returnObject));
                                     break;
                                 case TypeHints.TypeA.LONG:
-                                    putLong(frame, returnPosition, getContext().getMeta().unboxLong(returnObject));
+                                    putReifiedLong(frame, returnPosition, getContext().getMeta().unboxLong(returnObject));
                                     break;
                                 case TypeHints.TypeA.SHORT:
                                     putInt(frame, returnPosition, getContext().getMeta().unboxShort(returnObject));
