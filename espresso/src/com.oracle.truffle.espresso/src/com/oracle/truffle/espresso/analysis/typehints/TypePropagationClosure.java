@@ -270,10 +270,12 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     int returnValueSlotCount = resolvedMethod.getReturnKind().getSlotCount();
 
                     TypeHints.TypeB returnType = null;
-                    for (InvokeReturnTypeAttribute.Entry invokeReturnTypeAttribute : invokeReturnTypeAttributes) {
-                        if (invokeReturnTypeAttribute.getBytecodeOffset() == bci) {
-                            returnType = invokeReturnTypeAttribute.getReturnType();
-                            break;
+                    if (invokeReturnTypeAttributes != null){
+                        for (InvokeReturnTypeAttribute.Entry invokeReturnTypeAttribute : invokeReturnTypeAttributes) {
+                            if (invokeReturnTypeAttribute.getBytecodeOffset() == bci) {
+                                returnType = invokeReturnTypeAttribute.getReturnType();
+                                break;
+                            }
                         }
                     }
                     if (returnType != null){

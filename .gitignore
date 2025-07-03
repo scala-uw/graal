@@ -67,3 +67,4 @@ visualizer/IdealGraphVisualizer/*/target/
 .scala-build/
 .bsp/
 /substratevm/src/native-image-module-tests/*/target/
+scala-gen
