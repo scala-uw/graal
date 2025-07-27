@@ -38,7 +38,7 @@ public abstract class InvokeQuickNode extends QuickNode {
     // Helper information for easier arguments handling.
     protected final int resultAt;
     protected final int stackEffect;
-    private final int typeArgCnt;
+    protected final int typeArgCnt;
 
     // Helps check for no foreign objects
     private final boolean returnsPrimitive;
@@ -62,6 +62,15 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.resultAt = top - this.typeArgCnt - (SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.returnsPrimitive = m.getReturnKind().isPrimitive();
+    }
+
+    public InvokeQuickNode(Method method, int top, int callerBCI, int typeArgCnt) {
+        super(top, callerBCI);
+        this.method = method.getMethodVersion();
+        this.typeArgCnt = typeArgCnt;
+        this.resultAt = top - typeArgCnt - (SignatureSymbols.slotsForParameters(method.getParsedSignature()) + (method.hasReceiver() ? 1 : 0));
+        this.stackEffect = (resultAt - top) + method.getReturnKind().getSlotCount();
+        this.returnsPrimitive = method.getReturnKind().isPrimitive();
     }
 
     public final StaticObject peekReceiver(VirtualFrame frame) {

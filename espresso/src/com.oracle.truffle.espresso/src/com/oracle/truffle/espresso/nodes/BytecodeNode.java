@@ -376,6 +376,8 @@ import com.oracle.truffle.espresso.nodes.quick.interop.ReferenceArrayLoadQuickNo
 import com.oracle.truffle.espresso.nodes.quick.interop.ReferenceArrayStoreQuickNode;
 import com.oracle.truffle.espresso.nodes.quick.interop.ShortArrayLoadQuickNode;
 import com.oracle.truffle.espresso.nodes.quick.interop.ShortArrayStoreQuickNode;
+import com.oracle.truffle.espresso.nodes.quick.invoke.InvokeArrayApplyNode;
+import com.oracle.truffle.espresso.nodes.quick.invoke.InvokeArrayUpdateNode;
 import com.oracle.truffle.espresso.nodes.quick.invoke.InvokeContinuableNode;
 import com.oracle.truffle.espresso.nodes.quick.invoke.InvokeDynamicCallSiteNode;
 import com.oracle.truffle.espresso.nodes.quick.invoke.InvokeHandleNode;
@@ -598,6 +600,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                             checkNoForeignObjectAssumption(argument);
                             break;
                         } else {
+                            boolean isArray = false;
                             byte kind = typeB.getKind();
                             int index = typeB.getIndex();
                             byte reifiedTypeValue = TypeHints.TypeA.REFERENCE;
@@ -605,11 +608,22 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                 reifiedTypeValue = (byte) arguments[argCount + receiverSlot + index]; //TODO, CHECK THIS!!
                             } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM){
                                 //TODO
+                            } else if (kind == TypeHints.TypeB.ARR_METHOD_TYPE_PARAM){
+                                isArray = true;
+                                reifiedTypeValue = (byte) arguments[argCount + receiverSlot + index]; //TODO, CHECK THIS!!
+                            } else if (kind == TypeHints.TypeB.ARR_CLASS_TYPE_PARAM){
+                                isArray = true;
+                                //TODO
                             } else {
                                 CompilerDirectives.transferToInterpreterAndInvalidate();
                                 throw EspressoError.shouldNotReachHere("Unexpected type hint kind at BytecodeNode.initArguments: " + kind);
                             }
                             StaticObject argument = (StaticObject) arguments[i + receiverSlot];
+                            if (isArray) {
+                                setLocalObject(frame, curSlot, argument);
+                                checkNoForeignObjectAssumption(argument);
+                                break;
+                            }
                             switch (reifiedTypeValue){
                                 case TypeHints.TypeA.BYTE:
                                     setLocalInt(frame, curSlot, getContext().getMeta().unboxByte(argument)); break;
@@ -867,7 +881,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         MethodParameterTypeAttribute methodParameterType = methodVersion.getMethod().getMethodParameterTypeAttribute();
         InvokeReturnTypeAttribute invokeReturnType = methodVersion.getMethod().getInvokeReturnTypeAttribute();
         MethodReturnTypeAttribute methodReturnType = methodVersion.getMethod().getMethodReturnTypeAttribute();
-        if (false && (methodTypeParameterCount != null ||
+        if (true && (methodTypeParameterCount != null ||
             instructionTypeArguments != null ||
             methodParameterType != null ||
             invokeReturnType != null ||
@@ -2014,7 +2028,9 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 byte reifiedTypeValue = TypeHints.TypeB.resolveReifiedType(invokeReturnTypeHints[curBCI], frame, startReifiedTypes);
                 // need to add the stack effect of the opcode, then get the top object
                 int returnPosition = top + Bytecodes.stackEffectOf(curOpcode) - 1;
+                System.out.println("returnPosition: " + returnPosition + ", top: " + top + ", stackEffect: " + Bytecodes.stackEffectOf(curOpcode));
                 StaticObject returnObject = peekObject(frame, returnPosition);
+                System.out.println("case " + Bytecodes.nameOf(curOpcode) + ": returning reified type: " + returnObject.toVerboseString() + " with reified value: " + reifiedTypeValue);
                 switch (reifiedTypeValue){
                     case TypeHints.TypeA.BYTE:
                         putInt(frame, returnPosition, getContext().getMeta().unboxInteger(returnObject));
@@ -2836,6 +2852,22 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         ResolvedCall<Klass, Method, Field> resolvedCall = resolvedInvoke.resolvedCall();
         Method resolved = resolvedCall.getResolvedMethod();
         CallKind callKind = resolvedCall.getCallKind();
+
+        if (resolved.getNameAsString().equals("array_apply") && resolved.getDeclaringKlass().getNameAsString().equals("scala/runtime/ScalaRunTime$") && typeAnalysisRes != null){
+            System.out.println("Dispatching quickened invoke for " + resolved.getNameAsString() + " for class:" + resolved.getDeclaringKlass().getNameAsString() + " at BCI: " + curBCI);
+            System.out.println("type hint analysis:" + typeAnalysisRes[curBCI]);
+            TypeAnalysisResult typeAnalysis = typeAnalysisRes[curBCI];
+            if (typeAnalysis != null) {
+                return new InvokeArrayApplyNode(resolved, top, curBCI, typeAnalysis);
+            }
+        } else if (resolved.getNameAsString().equals("array_update") && resolved.getDeclaringKlass().getNameAsString().equals("scala/runtime/ScalaRunTime$") && typeAnalysisRes != null){
+            System.out.println("Dispatching quickened invoke for " + resolved.getNameAsString() + " for class:" + resolved.getDeclaringKlass().getNameAsString() + " at BCI: " + curBCI);
+            System.out.println("type hint analysis:" + typeAnalysisRes[curBCI]);
+            TypeAnalysisResult typeAnalysis = typeAnalysisRes[curBCI];
+            if (typeAnalysis != null) {
+                return new InvokeArrayUpdateNode(resolved, top, curBCI, typeAnalysis);
+            }
+        }
 
         // Skip inlined nodes if instrumentation is live.
         // Lock must be owned for correctness.
