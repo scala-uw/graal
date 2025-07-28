@@ -486,12 +486,14 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     private final TypeHints.TypeA[][] instructionTypeArgHints;
     private final TypeHints.TypeB[] invokeReturnTypeHints;
     private final TypeHints.TypeB[] methodParameterTypeHints;
+    private final MethodReturnTypeAttribute methodReturnTypeAttribute;
 
     private final TypeAnalysisResult[] typeAnalysisRes;
 
     private final boolean reifiedEnabled = true;
 
     public static final boolean DEBUG = false;
+    public final boolean hasAttributes;
 
     public BytecodeNode(MethodVersion methodVersion) {
         CompilerAsserts.neverPartOfCompilation();
@@ -536,6 +538,14 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         }
 
         this.typeAnalysisRes = this.reifiedTypesCnt > 0 ? TypeHintAnalysis.analyze(methodVersion).getRes() : null;
+        
+        methodReturnTypeAttribute = methodVersion.getMethod().getMethodReturnTypeAttribute();
+
+        this.hasAttributes = typeParamCntAttr != null ||
+                             instTypeArgAttr != null ||
+                             methodParameterTypeAttribute != null ||
+                             invokeReturnTypeAttr != null ||
+                             methodReturnTypeAttribute != null;
 
         this.frameDescriptor = createFrameDescriptor(methodVersion.getMaxLocals() + this.reifiedTypesCnt, methodVersion.getMaxStackSize() + maxExtraStack);
         this.noForeignObjects = Truffle.getRuntime().createAssumption("noForeignObjects");
@@ -565,7 +575,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     @ExplodeLoop
     private void initArguments(VirtualFrame frame) {
         Object[] arguments = frame.getArguments();
-
+        
         boolean hasReceiver = !getMethod().isStatic();
         int receiverSlot = hasReceiver ? 1 : 0;
         int curSlot = 0;
@@ -580,6 +590,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         Symbol<Type>[] methodSignature = getMethod().getParsedSignature();
         int argCount = SignatureSymbols.parameterCount(methodSignature);
         assert methodParameterTypeHints.length == argCount: "parameter hints length different from argument length";
+
         CompilerAsserts.partialEvaluationConstant(argCount);
         for (int i = 0; i < argCount; ++i) {
             Symbol<Type> argType = SignatureSymbols.parameterType(methodSignature, i);
@@ -861,28 +872,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         int top = startTop;
         CompilerAsserts.partialEvaluationConstant(startReifiedTypes);
 
-        //get and print the method attributes(if not all null)
-        MethodTypeParameterCountAttribute methodTypeParameterCount = methodVersion.getMethod().getMethodTypeParameterCountAttribute();
-        InstructionTypeArgumentsAttribute instructionTypeArguments = methodVersion.getMethod().getInstructionTypeArgumentsAttribute();
-        MethodParameterTypeAttribute methodParameterType = methodVersion.getMethod().getMethodParameterTypeAttribute();
-        InvokeReturnTypeAttribute invokeReturnType = methodVersion.getMethod().getInvokeReturnTypeAttribute();
-        MethodReturnTypeAttribute methodReturnType = methodVersion.getMethod().getMethodReturnTypeAttribute();
-        if (true && (methodTypeParameterCount != null ||
-            instructionTypeArguments != null ||
-            methodParameterType != null ||
-            invokeReturnType != null ||
-            methodReturnType != null)) {
-                System.out.println("in executeBodyFromBCI ~ Method: " + methodVersion.getMethod().getName());
-                System.out.println("    MethodTypeParameterCountAttribute: " + methodTypeParameterCount);
-                System.out.println("    InstructionTypeArgumentsAttribute: " + instructionTypeArguments);
-                System.out.println("    MethodParameterTypeAttribute: " + methodParameterType);
-                System.out.println("    InvokeReturnTypeAttribute: " + invokeReturnType);
-                System.out.println("    MethodReturnTypeAttribute: " + methodReturnType);
-                for (int i = 0; i < reifiedTypesCnt; i++) {
-                    System.out.println("    Reified type at " + i + ": " + (char) getReifiedTypeAt(frame, startReifiedTypes, i));
-                }
-        }
-
         if (instrument != null) {
             if (resumeContinuation) {
                 instrument.notifyResume(frame, this);
@@ -919,14 +908,10 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     setBCI(frame, curBCI);
                 }
 
-                if (DEBUG) {
+                if (DEBUG && hasAttributes) {
                     System.out.println("BytecodeNode.executeBodyFromBCI: for method:" + getMethodVersion().getName().toString() + 
                             " curBCI: " + curBCI + ", curOpcode: " + Bytecodes.nameOf(curOpcode) +
                             ", top: " + top + ", statementIndex: " + statementIndex);
-                }
-
-                if (methodTypeParameterCount != null) {
-                    // System.out.println("curBCI: " + curBCI + ", curOpcode: " + Bytecodes.nameOf(curOpcode));
                 }
                 // get the type propagation operands
                 TypeHints.TypeB[] typePropagationOperands = null;
@@ -934,9 +919,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     typePropagationOperands = typeAnalysisRes[curBCI] == null ? null : typeAnalysisRes[curBCI].getOperandsTypes();
                 }
                 CompilerAsserts.partialEvaluationConstant(typePropagationOperands);
-                if (methodTypeParameterCount != null) {
-                     // System.out.println("typePropagationOperands at BCI " + curBCI + " curOpcode: " + Bytecodes.nameOf(curOpcode) + ": " + Arrays.toString(typePropagationOperands));
-                }
 
                 // boxes the values if its an invoke using type propagation result
                 if (typeAnalysisRes != null) CompilerAsserts.partialEvaluationConstant(typeAnalysisRes[curBCI]);
@@ -1609,9 +1591,9 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                             case TypeHints.TypeA.BOOLEAN:
                                 returnValue = getContext().getMeta().boxBoolean((boolean) returnValue); break;
                         }
-                        // if (methodReturnType != null) {
-                        //     System.out.println("case RETURN: returning reified type: " + ((StaticObject) returnValue).toVerboseString() + "with reified value:" + returnTypeReifiedValue);
-                        // }
+                        if (DEBUG && methodReturnTypeAttribute != null) {
+                            System.out.println("case RETURN: returning reified type: " + ((StaticObject) returnValue).toVerboseString() + "with reified value:" + returnTypeReifiedValue);
+                        }
                         if (instrument != null) {
                             instrument.exitAt(frame, statementIndex, returnValue);
                         }
@@ -2008,14 +1990,15 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             }
             assert curOpcode != WIDE && curOpcode != LOOKUPSWITCH && curOpcode != TABLESWITCH;
             // unbox the returned object to the reified type if the InvokeReturnTypeHint is Mn or Kn
-            if (typeAnalysisRes[curBCI].isInvoke && invokeReturnTypeHints[curBCI] != null){
+            if (typeAnalysisRes != null && typeAnalysisRes[curBCI] != null && 
+                typeAnalysisRes[curBCI].isInvoke && invokeReturnTypeHints[curBCI] != null){
                 assert top >= 1;
                 byte reifiedTypeValue = TypeHints.TypeB.resolveReifiedType(invokeReturnTypeHints[curBCI], frame, startReifiedTypes);
                 // need to add the stack effect of the opcode, then get the top object
                 int returnPosition = top + Bytecodes.stackEffectOf(curOpcode) - 1;
-                System.out.println("returnPosition: " + returnPosition + ", top: " + top + ", stackEffect: " + Bytecodes.stackEffectOf(curOpcode));
+                if (DEBUG && hasAttributes) System.out.println("returnPosition: " + returnPosition + ", top: " + top + ", stackEffect: " + Bytecodes.stackEffectOf(curOpcode));
                 StaticObject returnObject = peekObject(frame, returnPosition);
-                System.out.println("case " + Bytecodes.nameOf(curOpcode) + ": returning reified type: " + returnObject.toVerboseString() + " with reified value: " + reifiedTypeValue);
+                if (DEBUG && hasAttributes) System.out.println("case " + Bytecodes.nameOf(curOpcode) + ": returning reified type: " + returnObject.toVerboseString() + " with reified value: " + reifiedTypeValue);
                 switch (reifiedTypeValue){
                     case TypeHints.TypeA.BYTE:
                         putInt(frame, returnPosition, getContext().getMeta().unboxInteger(returnObject));
@@ -2839,15 +2822,15 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         CallKind callKind = resolvedCall.getCallKind();
 
         if (resolved.getNameAsString().equals("array_apply") && resolved.getDeclaringKlass().getNameAsString().equals("scala/runtime/ScalaRunTime$") && typeAnalysisRes != null){
-            System.out.println("Dispatching quickened invoke for " + resolved.getNameAsString() + " for class:" + resolved.getDeclaringKlass().getNameAsString() + " at BCI: " + curBCI);
-            System.out.println("type hint analysis:" + typeAnalysisRes[curBCI]);
+            if (DEBUG && hasAttributes) System.out.println("Dispatching quickened invoke for " + resolved.getNameAsString() + " for class:" + resolved.getDeclaringKlass().getNameAsString() + " at BCI: " + curBCI);
+            if (DEBUG && hasAttributes) System.out.println("type hint analysis:" + typeAnalysisRes[curBCI]);
             TypeAnalysisResult typeAnalysis = typeAnalysisRes[curBCI];
             if (typeAnalysis != null) {
                 return new InvokeArrayApplyNode(resolved, top, curBCI, typeAnalysis, startReifiedTypes);
             }
         } else if (resolved.getNameAsString().equals("array_update") && resolved.getDeclaringKlass().getNameAsString().equals("scala/runtime/ScalaRunTime$") && typeAnalysisRes != null){
-            System.out.println("Dispatching quickened invoke for " + resolved.getNameAsString() + " for class:" + resolved.getDeclaringKlass().getNameAsString() + " at BCI: " + curBCI);
-            System.out.println("type hint analysis:" + typeAnalysisRes[curBCI]);
+            if (DEBUG && hasAttributes) System.out.println("Dispatching quickened invoke for " + resolved.getNameAsString() + " for class:" + resolved.getDeclaringKlass().getNameAsString() + " at BCI: " + curBCI);
+            if (DEBUG && hasAttributes) System.out.println("type hint analysis:" + typeAnalysisRes[curBCI]);
             TypeAnalysisResult typeAnalysis = typeAnalysisRes[curBCI];
             if (typeAnalysis != null) {
                 return new InvokeArrayUpdateNode(resolved, top, curBCI, typeAnalysis, startReifiedTypes);

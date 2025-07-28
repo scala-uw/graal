@@ -7,6 +7,7 @@ import com.oracle.truffle.espresso.EspressoLanguage;
 import com.oracle.truffle.espresso.analysis.typehints.TypeAnalysisResult;
 import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.impl.Method;
+import com.oracle.truffle.espresso.nodes.BytecodeNode;
 import com.oracle.truffle.espresso.nodes.EspressoFrame;
 import com.oracle.truffle.espresso.runtime.staticobject.StaticObject;
 
@@ -20,14 +21,14 @@ public final class InvokeArrayUpdateNode extends InvokeScalaNode {
 
     public InvokeArrayUpdateNode(Method method, int top, int callerBCI, TypeAnalysisResult typeAnalysis, int frameStartReifiedTypes) {
         // array_update is not annotated with attributes
-        super(method, top, callerBCI, 1);
+        super(method, top, callerBCI);
         TypeHints.TypeB[] operands = typeAnalysis.getOperandsTypes();
         assert operands.length == 3 : "Expected three operands for InvokeArrayUpdateNode, got " + Arrays.toString(operands);
         assert operands[0] != null && operands[1] == null && operands[2] != null : "Expected non-null, null, non-null, got " + Arrays.toString(operands);
         assert !method.isStatic();
         typeHint = operands[0];
         this.frameStartReifiedTypes = frameStartReifiedTypes;
-        System.out.println("InvokeArrayUpdateNode: typeHint=" + typeHint);
+        if (BytecodeNode.DEBUG) System.out.println("InvokeArrayUpdateNode: typeHint=" + typeHint);
     }
 
     @Override
