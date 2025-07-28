@@ -78,11 +78,10 @@ public class TypeHints {
     }
 
     public static class TypeB {
-        public static final TypeB NO_HINT = 
-            new TypeB((byte)0, -1);
         // public static final byte IS_ARRAY = 0;
         // public static final byte NOT_ARRAY = 1;
 
+        public static final byte EMPTY_KIND = 0;
         public static final byte CLASS_TYPE_PARAM = 'K';
         public static final byte METHOD_TYPE_PARAM = 'M';
         public static final byte ARR_CLASS_TYPE_PARAM = 'k';
@@ -99,6 +98,7 @@ public class TypeHints {
         //     this.index = index;
         // }
         public TypeB(byte kind, int index) {
+            assert kind == CLASS_TYPE_PARAM || kind == METHOD_TYPE_PARAM || kind == ARR_CLASS_TYPE_PARAM || kind == ARR_METHOD_TYPE_PARAM;
             this.kind = kind;
             this.index = index;
         }
@@ -109,10 +109,6 @@ public class TypeHints {
 
         public int getIndex() {
             return index;
-        }
-
-        public boolean isNoHint() {
-            return this == NO_HINT || (this.kind == 0 && this.index == -1);
         }
 
         public static byte resolveReifiedType(TypeB typeBInstance, VirtualFrame frame, int startMethodTypeParams) {
@@ -126,6 +122,20 @@ public class TypeHints {
             } else if (typeBInstance.kind == CLASS_TYPE_PARAM) {
                 return TypeA.REFERENCE; // TODO: class type params
             } else {
+                return TypeA.REFERENCE;
+            }
+        }
+
+        public static byte resolveArrayElementReifiedType(TypeB typeBInstance, VirtualFrame frame, int startMethodTypeParams) {
+            assert typeBInstance != null;
+            CompilerAsserts.partialEvaluationConstant(typeBInstance.kind);
+            CompilerAsserts.partialEvaluationConstant(typeBInstance.index);
+            byte kind = typeBInstance.kind;
+            assert kind == ARR_CLASS_TYPE_PARAM || kind == ARR_METHOD_TYPE_PARAM;
+            if (kind == ARR_METHOD_TYPE_PARAM) {
+                return (byte) frame.getIntStatic(startMethodTypeParams + typeBInstance.index);
+            } else {
+                // TODO: class type params
                 return TypeA.REFERENCE;
             }
         }
@@ -146,9 +156,6 @@ public class TypeHints {
 
         @Override
         public String toString() {
-            if (isNoHint()) {
-                return "TypeB{NO_HINT}";
-            }
             return "TypeB{" +
                             "kind=" + (char) kind +
                             ", index=" + index +

@@ -331,15 +331,15 @@ import static com.oracle.truffle.espresso.nodes.EspressoFrame.popDouble;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.popFloat;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.popInt;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.popLong;
-import static com.oracle.truffle.espresso.nodes.EspressoFrame.putReifiedLong;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.popObject;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.popReturnAddressOrObject;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.putDouble;
-import static com.oracle.truffle.espresso.nodes.EspressoFrame.putReifiedDouble;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.putFloat;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.putInt;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.putLong;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.putObject;
+import static com.oracle.truffle.espresso.nodes.EspressoFrame.putReifiedDouble;
+import static com.oracle.truffle.espresso.nodes.EspressoFrame.putReifiedLong;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.putReturnAddress;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.setBCI;
 import static com.oracle.truffle.espresso.nodes.EspressoFrame.setLocalDouble;
@@ -482,6 +482,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     private final int throwValueBci;
 
     private final int reifiedTypesCnt;
+    private final int startReifiedTypes;
     private final TypeHints.TypeA[][] instructionTypeArgHints;
     private final TypeHints.TypeB[] invokeReturnTypeHints;
     private final TypeHints.TypeB[] methodParameterTypeHints;
@@ -489,6 +490,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     private final TypeAnalysisResult[] typeAnalysisRes;
 
     private final boolean reifiedEnabled = true;
+
+    public static final boolean DEBUG = false;
 
     public BytecodeNode(MethodVersion methodVersion) {
         CompilerAsserts.neverPartOfCompilation();
@@ -503,6 +506,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         this.bs = new BytecodeStream(code);
         this.stackOverflowErrorInfo = method.getSOEHandlerInfo();
 
+        this.startReifiedTypes = startingReifiedTypesOffset(methodVersion.getMaxLocals());
         MethodTypeParameterCountAttribute typeParamCntAttr = methodVersion.getMethod().getMethodTypeParameterCountAttribute();
         this.reifiedTypesCnt = typeParamCntAttr != null ? typeParamCntAttr.getCount() : 0;
         int maxExtraStack = 0; // for passing reified types at invoke/new
@@ -600,30 +604,15 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                             checkNoForeignObjectAssumption(argument);
                             break;
                         } else {
-                            boolean isArray = false;
                             byte kind = typeB.getKind();
                             int index = typeB.getIndex();
                             byte reifiedTypeValue = TypeHints.TypeA.REFERENCE;
                             if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM){
                                 reifiedTypeValue = (byte) arguments[argCount + receiverSlot + index]; //TODO, CHECK THIS!!
                             } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM){
-                                //TODO
-                            } else if (kind == TypeHints.TypeB.ARR_METHOD_TYPE_PARAM){
-                                isArray = true;
-                                reifiedTypeValue = (byte) arguments[argCount + receiverSlot + index]; //TODO, CHECK THIS!!
-                            } else if (kind == TypeHints.TypeB.ARR_CLASS_TYPE_PARAM){
-                                isArray = true;
-                                //TODO
-                            } else {
-                                CompilerDirectives.transferToInterpreterAndInvalidate();
-                                throw EspressoError.shouldNotReachHere("Unexpected type hint kind at BytecodeNode.initArguments: " + kind);
-                            }
+                                //TODO: class type params
+                            } // treat generic arrays as TypeA.REFERENCE
                             StaticObject argument = (StaticObject) arguments[i + receiverSlot];
-                            if (isArray) {
-                                setLocalObject(frame, curSlot, argument);
-                                checkNoForeignObjectAssumption(argument);
-                                break;
-                            }
                             switch (reifiedTypeValue){
                                 case TypeHints.TypeA.BYTE:
                                     setLocalInt(frame, curSlot, getContext().getMeta().unboxByte(argument)); break;
@@ -870,10 +859,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         setBCI(frame, startBCI);
         int curBCI = startBCI;
         int top = startTop;
-        int startReifiedTypes = startingReifiedTypesOffset(getMethodVersion().getMaxLocals());
         CompilerAsserts.partialEvaluationConstant(startReifiedTypes);
-
-        boolean printBCIOPCode = false;
 
         //get and print the method attributes(if not all null)
         MethodTypeParameterCountAttribute methodTypeParameterCount = methodVersion.getMethod().getMethodTypeParameterCountAttribute();
@@ -895,7 +881,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 for (int i = 0; i < reifiedTypesCnt; i++) {
                     System.out.println("    Reified type at " + i + ": " + (char) getReifiedTypeAt(frame, startReifiedTypes, i));
                 }
-                printBCIOPCode = true;
         }
 
         if (instrument != null) {
@@ -934,7 +919,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     setBCI(frame, curBCI);
                 }
 
-                if (printBCIOPCode) {
+                if (DEBUG) {
                     System.out.println("BytecodeNode.executeBodyFromBCI: for method:" + getMethodVersion().getName().toString() + 
                             " curBCI: " + curBCI + ", curOpcode: " + Bytecodes.nameOf(curOpcode) +
                             ", top: " + top + ", statementIndex: " + statementIndex);
@@ -2023,7 +2008,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             }
             assert curOpcode != WIDE && curOpcode != LOOKUPSWITCH && curOpcode != TABLESWITCH;
             // unbox the returned object to the reified type if the InvokeReturnTypeHint is Mn or Kn
-            if (invokeReturnTypeHints[curBCI] != null){
+            if (typeAnalysisRes[curBCI].isInvoke && invokeReturnTypeHints[curBCI] != null){
                 assert top >= 1;
                 byte reifiedTypeValue = TypeHints.TypeB.resolveReifiedType(invokeReturnTypeHints[curBCI], frame, startReifiedTypes);
                 // need to add the stack effect of the opcode, then get the top object
@@ -2858,14 +2843,14 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             System.out.println("type hint analysis:" + typeAnalysisRes[curBCI]);
             TypeAnalysisResult typeAnalysis = typeAnalysisRes[curBCI];
             if (typeAnalysis != null) {
-                return new InvokeArrayApplyNode(resolved, top, curBCI, typeAnalysis);
+                return new InvokeArrayApplyNode(resolved, top, curBCI, typeAnalysis, startReifiedTypes);
             }
         } else if (resolved.getNameAsString().equals("array_update") && resolved.getDeclaringKlass().getNameAsString().equals("scala/runtime/ScalaRunTime$") && typeAnalysisRes != null){
             System.out.println("Dispatching quickened invoke for " + resolved.getNameAsString() + " for class:" + resolved.getDeclaringKlass().getNameAsString() + " at BCI: " + curBCI);
             System.out.println("type hint analysis:" + typeAnalysisRes[curBCI]);
             TypeAnalysisResult typeAnalysis = typeAnalysisRes[curBCI];
             if (typeAnalysis != null) {
-                return new InvokeArrayUpdateNode(resolved, top, curBCI, typeAnalysis);
+                return new InvokeArrayUpdateNode(resolved, top, curBCI, typeAnalysis, startReifiedTypes);
             }
         }
 

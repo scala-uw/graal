@@ -113,11 +113,11 @@ public class TypePropagationClosure extends BlockIteratorClosure{
             for (int i = 0; i < paramCnt; i++){
                 Symbol<Type> cur = SignatureSymbols.parameterType(signature, i);
                 if (cur.byteAt(0) == 'J' || cur.byteAt(0) == 'D'){
-                    assert methodParameterTypes[i].isNoHint();
+                    assert methodParameterTypes[i] == null;
                     rootState.locals[localIndex] = null;
                     localIndex ++;
                 } else {
-                    rootState.locals[localIndex] = methodParameterTypes[i].isNoHint() ? null : methodParameterTypes[i];
+                    rootState.locals[localIndex] = methodParameterTypes[i];
                 }
                 localIndex++;
             }
@@ -245,6 +245,34 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     ResolvedCall<Klass, Method, Field> resolvedCall = 
                         EspressoLinkResolver.resolveCallSiteOrThrow(ctx, getDeclaringKlass(), resolutionSeed, callSiteType, symbolicRef);
                     Method resolvedMethod = resolvedCall.getResolvedMethod();
+
+                    if (resolvedMethod.getNameAsString().equals("array_apply") && resolvedMethod.getDeclaringKlass().getNameAsString().equals("scala/runtime/ScalaRunTime$")) {
+                        TypeHints.TypeB xs_type = state.stack[state.stackTop - 2];
+                        byte xs_type_kind = xs_type.getKind();
+                        assert xs_type_kind == TypeHints.TypeB.ARR_CLASS_TYPE_PARAM
+                            || xs_type_kind == TypeHints.TypeB.ARR_METHOD_TYPE_PARAM;
+                        if (xs_type_kind == TypeHints.TypeB.ARR_CLASS_TYPE_PARAM) {
+                            // TODO: class type params
+                        } else { // ARR_METHOD_TYPE_PARAM
+                            state.stack[state.stackTop - 3] = new TypeHints.TypeB(TypeHints.TypeB.METHOD_TYPE_PARAM, xs_type.getIndex());
+                        }
+                        TypeHints.TypeB[] argsHint = new TypeHints.TypeB[2];
+                        assert state.stack[state.stackTop - 1] == null;
+                        argsHint[0] = xs_type;
+                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, false);
+                        state.stackTop -= 2;
+                        break;
+                    }
+                    if (resolvedMethod.getNameAsString().equals("array_update") && resolvedMethod.getDeclaringKlass().getNameAsString().equals("scala/runtime/ScalaRunTime$")) {
+                        TypeHints.TypeB[] argsHint = new TypeHints.TypeB[3];
+                        argsHint[0] = state.stack[state.stackTop - 3];
+                        assert state.stack[state.stackTop - 2] == null;
+                        argsHint[2] = state.stack[state.stackTop - 1];
+                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, false);
+                        state.stackTop -= 4;
+                        break;
+                    }
+                    
                     Symbol<Type>[] signature = resolvedMethod.getParsedSignature();
                     int paramCnt = SignatureSymbols.parameterCount(signature);
                     TypeHints.TypeB[] argsHint = new TypeHints.TypeB[paramCnt];
@@ -281,7 +309,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     if (returnType != null){
                         if (debug) System.out.println("method return type of method " + resolvedMethod.getName() + ": " + returnType);
                         for (int i = 0; i < returnValueSlotCount; i++){
-                            state.stack[state.stackTop++] = returnType.isNoHint() ? null : returnType;
+                            state.stack[state.stackTop++] = returnType;
                         }
                     } else {
                         //no type hints for the return value

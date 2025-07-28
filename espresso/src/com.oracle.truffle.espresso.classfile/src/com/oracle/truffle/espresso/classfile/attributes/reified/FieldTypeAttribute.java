@@ -10,8 +10,6 @@ import com.oracle.truffle.espresso.classfile.descriptors.Symbol;
 public class FieldTypeAttribute extends Attribute{
     public static final Symbol<Name> NAME = ParserNames.FieldType;
 
-    public static final FieldTypeAttribute EMPTY = new FieldTypeAttribute(NAME, TypeHints.TypeB.NO_HINT);
-
     private final TypeB fieldType;
 
     public FieldTypeAttribute(Symbol<Name> name, TypeB fieldType) {
