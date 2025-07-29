@@ -616,6 +616,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                             break;
                         } else {
                             byte kind = typeB.getKind();
+                            int outerClassIndex = typeB.getOuterClassIndex();
                             int index = typeB.getIndex();
                             byte reifiedTypeValue = TypeHints.TypeA.REFERENCE;
                             if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM){
@@ -1562,6 +1563,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                             TypeHints.TypeB typeB = typePropagationOperands[0];
                             if (typeB != null){
                                 byte kind = typeB.getKind();
+                                int outerClassIndex = typeB.getOuterClassIndex();
                                 int index = typeB.getIndex();
                                 if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
                                     returnTypeReifiedValue = getReifiedTypeAt(frame, startReifiedTypes, index);

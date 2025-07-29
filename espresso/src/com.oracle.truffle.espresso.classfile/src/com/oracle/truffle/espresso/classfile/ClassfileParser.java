@@ -1330,18 +1330,46 @@ public final class ClassfileParser {
         return new SourceDebugExtensionAttribute(name, debugExtension);
     }
 
+    /*
+    MethodTypeParameterCount_attribute {
+        u2 attribute_name_index;
+        u4 attribute_length;
+        u2 count;
+    }
+    */
     private MethodTypeParameterCountAttribute parseMethodTypeParameterCount(Symbol<Name> name) {
         assert ParserNames.MethodTypeParameterCount.equals(name);
         int count = stream.readU2();
         return new MethodTypeParameterCountAttribute(name, count);
     }
 
+    /*
+    ClassTypeParameterCount_attribute {
+        u2 attribute_name_index;
+        u4 attribute_length;
+        u2 count;
+    }
+    */
     private ClassTypeParameterCountAttribute parseClassTypeParameterCount(Symbol<Name> name) {
         assert ParserNames.ClassTypeParameterCount.equals(name);
         int count = stream.readU2();
         return new ClassTypeParameterCountAttribute(name, count);
     }
 
+    /*
+    InstructionTypeArguments_attribute {
+        u2 attribute_name_index;
+        u4 attribute_length;
+        u2 typehint_length;
+        { 	u2 byecode_offset
+            u2 typeA_number
+            {	u1 K_M_indicator
+                u2 outer_class_indicator
+                u2 index
+            } typeAs[typeA_number]
+        } typeHints[typehint_length];
+    }
+    */
     private InstructionTypeArgumentsAttribute parseInstructionTypeArguments(Symbol<Name> name) {
         assert ParserNames.InstructionTypeArguments.equals(name);
         int entryCount = stream.readU2();
@@ -1355,14 +1383,26 @@ public final class ClassfileParser {
             TypeHints.TypeA[] typeArguments = new TypeHints.TypeA[typeANum];
             for (int j = 0; j < typeANum; j++) {
                 byte kind = (byte) stream.readU1();
+                int outerClassIndicator = stream.readU2();
                 int index = stream.readU2();
-                typeArguments[j] = new TypeHints.TypeA(kind, index);
+                typeArguments[j] = new TypeHints.TypeA(kind, outerClassIndicator, index);
             }
             entries[i] = new InstructionTypeArgumentsAttribute.Entry(bcOffset, typeArguments);
         }
         return new InstructionTypeArgumentsAttribute(name, entries);
     }
 
+    /*
+    MethodParameterType_attribute {
+        u2 attribute_name_index;
+        u4 attribute_length;
+        u2 parameter_count;
+        {	u1 K_M_indicator
+            u2 outer_class_indicator
+            u2 index
+        } typeBs[parameter_count];
+    }
+    */
     private MethodParameterTypeAttribute parseMethodParameterType(Symbol<Name> name) {
         assert ParserNames.MethodParameterType.equals(name);
         int parameterCount = stream.readU2();
@@ -1372,14 +1412,27 @@ public final class ClassfileParser {
         TypeHints.TypeB[] typeBs = new TypeHints.TypeB[parameterCount];
         for (int i = 0; i < parameterCount; i++) {
             byte kind = (byte) stream.readU1();
+            int outerClassIndicator = stream.readU2();
             int index = stream.readU2();
             if (kind != TypeHints.TypeB.EMPTY_KIND) {
-                typeBs[i] = new TypeHints.TypeB(kind, index);
+                typeBs[i] = new TypeHints.TypeB(kind, outerClassIndicator, index);
             } // else remain null
         }
         return new MethodParameterTypeAttribute(name, parameterCount, typeBs);
     }
 
+    /*
+    InvokeReturnType_attribute {
+        u2 attribute_name_index;
+        u4 attribute_length;
+        u2 typehint_length;
+        { 	u2 byecode_offset
+            u1 K_M_indicator
+            u2 outer_class_indicator
+            u2 index
+        } typeHints[typehint_length];
+    }
+    */
     private InvokeReturnTypeAttribute parseInvokeReturnType(Symbol<Name> name) {
         assert ParserNames.InvokeReturnType.equals(name);
         int typeHintLength = stream.readU2();
@@ -1389,28 +1442,56 @@ public final class ClassfileParser {
         InvokeReturnTypeAttribute.Entry[] entries = new InvokeReturnTypeAttribute.Entry[typeHintLength];
         for (int i = 0; i < typeHintLength; i++) {
             int bcOffset = stream.readU2();
-            int typeANum = stream.readU2();
-            assert typeANum == 1 : "parseInvokeReturnType: typeANum should be 1, but was " + typeANum;
             byte kind = (byte) stream.readU1();
+            int outerClassIndicator = stream.readU2();
             int index = stream.readU2();
             entries[i] = new InvokeReturnTypeAttribute.Entry(
-                bcOffset, kind != TypeHints.TypeB.EMPTY_KIND ? (new TypeHints.TypeB(kind, index)) : null);
+                bcOffset, kind != TypeHints.TypeB.EMPTY_KIND ? (new TypeHints.TypeB(kind, outerClassIndicator, index)) : null);
         }
         return new InvokeReturnTypeAttribute(name, entries);
     }
 
+    /*
+    InvokeReturnType_attribute {
+        u2 attribute_name_index;
+        u4 attribute_length;
+        u2 typehint_length;
+        { 	u2 byecode_offset
+            u1 K_M_indicator
+            u2 outer_class_indicator
+            u2 index
+        } typeHints[typehint_length];
+    }
+    */
     private MethodReturnTypeAttribute parseMethodReturnType(Symbol<Name> name) {
         assert ParserNames.MethodReturnType.equals(name);
         byte kind = (byte) stream.readU1();
+        int outerClassIndicator = stream.readU2();
         int index = stream.readU2();
-        return new MethodReturnTypeAttribute(name, kind != TypeHints.TypeB.EMPTY_KIND ? (new TypeHints.TypeB(kind, index)) : null);
+        return new MethodReturnTypeAttribute(name, 
+            kind != TypeHints.TypeB.EMPTY_KIND ? 
+            (new TypeHints.TypeB(kind, outerClassIndicator, index)) 
+            : null);
     }
 
+    /*
+    FieldType_attribute{
+        u2 attribute_name_index;
+        u4 attribute_length;
+        u1 K_M_indicator; (should be always K?)
+        u2 outer_class_indicator
+        u2 index;
+    }
+    */
     private FieldTypeAttribute parseFieldType(Symbol<Name> name) {
         assert ParserNames.FieldType.equals(name);
         byte kind = (byte) stream.readU1();
+        int outerClassIndicator = stream.readU2();
         int index = stream.readU2();
-        return new FieldTypeAttribute(name, kind != TypeHints.TypeB.EMPTY_KIND ? (new TypeHints.TypeB(kind, index)) : null);
+        return new FieldTypeAttribute(name, 
+            kind != TypeHints.TypeB.EMPTY_KIND ? 
+            (new TypeHints.TypeB(kind, outerClassIndicator, index)) 
+            : null);
     }
 
     private LineNumberTableAttribute parseLineNumberTable(Symbol<Name> name) {
