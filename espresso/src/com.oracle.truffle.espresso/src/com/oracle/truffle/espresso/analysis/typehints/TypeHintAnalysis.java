@@ -11,7 +11,7 @@ import com.oracle.truffle.espresso.runtime.EspressoContext;
 
 public class TypeHintAnalysis {
     private static final boolean DEBUG = false;
-    public static TypeHintAnalysis analyze(Method.MethodVersion methodVersion){
+    public static TypeHintAnalysis analyze(Method.MethodVersion methodVersion, boolean showTypeAnalysis) {
         Method method = methodVersion.getMethod();
         Graph<? extends LinkedBlock> graph = GraphBuilder.build(method);
         if (DEBUG) {
@@ -25,7 +25,7 @@ public class TypeHintAnalysis {
         int totalBlocks = graph.totalBlocks();
         TypePropagationClosure closure = new TypePropagationClosure(context, codeLength, methodVersion, maxLocals, maxStack, totalBlocks);
         BlockIterator.analyze(method, graph, closure);
-        if (DEBUG) {
+        if (DEBUG || showTypeAnalysis) {
             System.out.println("Type hints analysis completed for method: " + method.getName());
             System.out.println("Resulting type hints: ");
             for (int i = 0; i < closure.getRes().length; i++) {

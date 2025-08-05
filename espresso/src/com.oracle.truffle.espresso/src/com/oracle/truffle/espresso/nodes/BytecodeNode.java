@@ -493,6 +493,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     private final boolean reifiedEnabled = true;
 
     public static final boolean DEBUG = false;
+    public static final boolean SHOW_TYPEANALYSIS = true;
     public final boolean hasAttributes;
 
     public BytecodeNode(MethodVersion methodVersion) {
@@ -537,7 +538,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             }
         }
 
-        this.typeAnalysisRes = this.reifiedTypesCnt > 0 ? TypeHintAnalysis.analyze(methodVersion).getRes() : null;
+        this.typeAnalysisRes = this.reifiedTypesCnt > 0 ? TypeHintAnalysis.analyze(methodVersion, SHOW_TYPEANALYSIS).getRes() : null;
         
         methodReturnTypeAttribute = methodVersion.getMethod().getMethodReturnTypeAttribute();
 
@@ -2079,6 +2080,12 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         assert !klass.isPrimitive() : "Verifier guarantee";
         GuestAllocator.AllocationChecks.checkCanAllocateNewReference(getMethod().getMeta(), klass, true, this);
         return getAllocator().createNew((ObjectKlass) klass);
+    }
+
+    private StaticObject newReifiedObject(Klass klass, byte[] reifiedTypeValues){
+        assert !klass.isPrimitive() : "Verifier guarantee";
+        GuestAllocator.AllocationChecks.checkCanAllocateNewReference(getMethod().getMeta(), klass, true, this);
+        return getAllocator().createNewReified((ObjectKlass) klass, reifiedTypeValues);
     }
 
     private StaticObject newPrimitiveArray(byte jvmPrimitiveType, int length) {

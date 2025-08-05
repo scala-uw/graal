@@ -28,6 +28,7 @@ import java.lang.reflect.Modifier;
 
 import com.oracle.truffle.api.CompilerDirectives.CompilationFinal;
 import com.oracle.truffle.espresso.classfile.attributes.Attribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.FieldTypeAttribute;
 import com.oracle.truffle.espresso.classfile.descriptors.Name;
 import com.oracle.truffle.espresso.classfile.descriptors.Symbol;
 import com.oracle.truffle.espresso.classfile.descriptors.Type;
@@ -64,6 +65,16 @@ public final class ParserField {
 
     public Attribute[] getAttributes() {
         return attributes;
+    }
+
+    public FieldTypeAttribute getFieldTypeAttribute(){
+        Attribute[] attrs = getAttributes();
+        for (Attribute attr : attrs) {
+            if (attr instanceof FieldTypeAttribute att) {
+                return att;
+            }
+        }
+        return null;
     }
 
     public ParserField(int flags, Symbol<Name> name, Symbol<Type> type, final Attribute[] attributes) {

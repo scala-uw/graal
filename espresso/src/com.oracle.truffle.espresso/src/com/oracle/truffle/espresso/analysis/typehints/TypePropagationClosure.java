@@ -254,7 +254,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                         if (xs_type_kind == TypeHints.TypeB.ARR_CLASS_TYPE_PARAM) {
                             // TODO: class type params
                         } else { // ARR_METHOD_TYPE_PARAM
-                            state.stack[state.stackTop - 3] = new TypeHints.TypeB(TypeHints.TypeB.METHOD_TYPE_PARAM, xs_type.getIndex());
+                            state.stack[state.stackTop - 3] = new TypeHints.TypeB(TypeHints.TypeB.METHOD_TYPE_PARAM, 0, xs_type.getIndex());
                         }
                         TypeHints.TypeB[] argsHint = new TypeHints.TypeB[2];
                         assert state.stack[state.stackTop - 1] == null;

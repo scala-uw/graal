@@ -1248,6 +1248,7 @@ public final class ClassfileParser {
                     throw classFormatError("Duplicate ClassTypeParameterCount attribute");
                 }
                 classAttributes[i] = classTypeParameterCount = parseClassTypeParameterCount(attributeName);
+                System.out.println("ClassTypeParameterCount: " + classTypeParameterCount + " for class:" + classType.toString());
             } else if (majorVersion >= JAVA_1_5_VERSION) {
                 if (majorVersion >= JAVA_7_VERSION && attributeName.equals(ParserNames.BootstrapMethods)) {
                     if (bootstrapMethods != null) {
@@ -2054,6 +2055,7 @@ public final class ClassfileParser {
                     throw classFormatError("Duplicate FieldType attribute");
                 }
                 fieldAttributes[i] = fieldTypeAttribute = parseFieldType(attributeName);
+                System.out.println("FieldType attribute: " + fieldTypeAttribute + " for field: " + name + " in class: " + classType.toString());
             } else if (majorVersion >= JAVA_1_5_VERSION) {
                 if (attributeName.equals(ParserNames.RuntimeVisibleAnnotations)) {
                     RuntimeVisibleAnnotationsAttribute annotations = commonAttributeParser.parseRuntimeVisibleAnnotations(attributeSize, AnnotationLocation.Field);

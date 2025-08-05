@@ -23,6 +23,7 @@
 package com.oracle.truffle.espresso.impl;
 
 import static com.oracle.truffle.espresso.classfile.Constants.ACC_HIDDEN;
+
 import static java.util.Map.entry;
 
 import java.util.HashSet;
@@ -38,6 +39,7 @@ import com.oracle.truffle.espresso.classfile.Constants;
 import com.oracle.truffle.espresso.classfile.JavaVersion.VersionRange;
 import com.oracle.truffle.espresso.classfile.ParserField;
 import com.oracle.truffle.espresso.classfile.ParserKlass;
+import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.classfile.descriptors.Name;
 import com.oracle.truffle.espresso.classfile.descriptors.Symbol;
 import com.oracle.truffle.espresso.classfile.descriptors.Type;
@@ -98,6 +100,54 @@ final class LinkedKlassFieldLayout {
         fieldTableLength = nextInstanceFieldSlot;
     }
 
+    LinkedKlassFieldLayout(EspressoLanguage language, ParserKlass parserKlass, LinkedKlass superKlass, byte[] reifiedFieldTypes){
+        StaticShape.Builder instanceBuilder = StaticShape.newBuilder(language);
+        StaticShape.Builder staticBuilder = StaticShape.newBuilder(language);
+
+        FieldCounter fieldCounter = new FieldCounter(parserKlass, language);
+        int nextInstanceFieldIndex = 0;
+        int nextStaticFieldIndex = 0;
+        int nextInstanceFieldSlot = superKlass == null ? 0 : superKlass.getFieldTableLength();
+        int nextStaticFieldSlot = 0;
+
+        staticFields = new LinkedField[fieldCounter.staticFields];
+        instanceFields = new LinkedField[fieldCounter.instanceFields];
+
+        LinkedField.IdMode idMode = getIdMode(parserKlass);
+
+        for (ParserField parserField : parserKlass.getFields()) {
+            if (parserField.getFieldTypeAttribute() != null) {
+                int index = parserField.getFieldTypeAttribute().getFieldType().getIndex(); // considering only K0,n for now
+                byte reifiedType = reifiedFieldTypes[index];
+                if (parserField.isStatic()) {
+                    createAndRegisterLinkedField(parserKlass, parserField, nextStaticFieldSlot++, nextStaticFieldIndex++, idMode, staticBuilder, staticFields, reifiedType);
+                } else {
+                    createAndRegisterLinkedField(parserKlass, parserField, nextInstanceFieldSlot++, nextInstanceFieldIndex++, idMode, instanceBuilder, instanceFields, reifiedType);
+                }
+            }
+            if (parserField.isStatic()) {
+                createAndRegisterLinkedField(parserKlass, parserField, nextStaticFieldSlot++, nextStaticFieldIndex++, idMode, staticBuilder, staticFields);
+            } else {
+                createAndRegisterLinkedField(parserKlass, parserField, nextInstanceFieldSlot++, nextInstanceFieldIndex++, idMode, instanceBuilder, instanceFields);
+            }
+        }
+
+        for (HiddenField hiddenField : fieldCounter.hiddenFieldNames) {
+            if (hiddenField.predicate.test(language)) {
+                ParserField hiddenParserField = new ParserField(ACC_HIDDEN | hiddenField.additionalFlags, hiddenField.name, hiddenField.type, null);
+                createAndRegisterLinkedField(parserKlass, hiddenParserField, nextInstanceFieldSlot++, nextInstanceFieldIndex++, idMode, instanceBuilder, instanceFields);
+            }
+        }
+
+        if (superKlass == null) {
+            instanceShape = instanceBuilder.build(StaticObject.class, StaticObjectFactory.class);
+        } else {
+            instanceShape = instanceBuilder.build(superKlass.getShape(false));
+        }
+        staticShape = staticBuilder.build(StaticObject.class, StaticObjectFactory.class);
+        fieldTableLength = nextInstanceFieldSlot;
+    }
+
     /**
      * Makes sure that the field IDs passed to the shape builder are all unique.
      */
@@ -132,6 +182,25 @@ final class LinkedKlassFieldLayout {
     private static void createAndRegisterLinkedField(ParserKlass parserKlass, ParserField parserField, int slot, int index, LinkedField.IdMode idMode, Builder builder, LinkedField[] linkedFields) {
         LinkedField field = new LinkedField(parserField, slot, idMode);
         builder.property(field, LinkedField.getPropertyType(parserField), storeAsFinal(parserKlass, parserField));
+        linkedFields[index] = field;
+    }
+
+    private static void createAndRegisterLinkedField(ParserKlass parserKlass, ParserField parserField, int slot, int index, LinkedField.IdMode idMode, Builder builder, LinkedField[] linkedFields,
+                                                     byte reifiedType) {
+        LinkedField field = new LinkedField(parserField, slot, idMode);
+        Class<?> fieldType;
+        switch (reifiedType) {
+            case TypeHints.TypeA.BYTE: fieldType = byte.class; break;
+            case TypeHints.TypeA.CHAR: fieldType = char.class; break;
+            case TypeHints.TypeA.DOUBLE: fieldType = double.class; break;
+            case TypeHints.TypeA.FLOAT: fieldType = float.class; break;
+            case TypeHints.TypeA.INT: fieldType = int.class; break;
+            case TypeHints.TypeA.LONG: fieldType = long.class; break;
+            case TypeHints.TypeA.SHORT: fieldType = short.class; break;
+            case TypeHints.TypeA.BOOLEAN: fieldType = boolean.class; break;
+            default: fieldType = StaticObject.class; break; //can never be hidden fields
+        }
+        builder.property(field, fieldType, storeAsFinal(parserKlass, parserField));
         linkedFields[index] = field;
     }
 
