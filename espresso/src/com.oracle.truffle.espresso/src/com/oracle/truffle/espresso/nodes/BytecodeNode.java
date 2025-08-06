@@ -483,11 +483,15 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
     private final int reifiedTypesCnt;
     private final int startReifiedTypes;
+    @CompilationFinal(dimensions = 2)
     private final TypeHints.TypeA[][] instructionTypeArgHints;
+    @CompilationFinal(dimensions = 1)
     private final TypeHints.TypeB[] invokeReturnTypeHints;
+    @CompilationFinal(dimensions = 1)
     private final TypeHints.TypeB[] methodParameterTypeHints;
     private final MethodReturnTypeAttribute methodReturnTypeAttribute;
 
+    @CompilationFinal(dimensions = 1)
     private final TypeAnalysisResult[] typeAnalysisRes;
 
     private final boolean reifiedEnabled = true;

@@ -1,8 +1,10 @@
 package com.oracle.truffle.espresso.analysis.typehints;
 
+import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 
 public class TypeAnalysisResult {
+    @CompilerDirectives.CompilationFinal(dimensions = 1)
     public final TypeHints.TypeB[] operands;
     public final boolean isInvoke;
 
