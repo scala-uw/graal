@@ -6,6 +6,7 @@ import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 public class TypeAnalysisResult {
     @CompilerDirectives.CompilationFinal(dimensions = 1)
     public final TypeHints.TypeB[] operands;
+    @CompilerDirectives.CompilationFinal
     public final boolean isInvoke;
 
     TypeAnalysisResult(TypeHints.TypeB[] content) {

@@ -481,7 +481,9 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     private final int returnValueBci;
     private final int throwValueBci;
 
+    @CompilationFinal
     private final int reifiedTypesCnt;
+    @CompilationFinal
     private final int startReifiedTypes;
     @CompilationFinal(dimensions = 2)
     private final TypeHints.TypeA[][] instructionTypeArgHints;
@@ -489,15 +491,18 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     private final TypeHints.TypeB[] invokeReturnTypeHints;
     @CompilationFinal(dimensions = 1)
     private final TypeHints.TypeB[] methodParameterTypeHints;
-    private final MethodReturnTypeAttribute methodReturnTypeAttribute;
 
     @CompilationFinal(dimensions = 1)
     private final TypeAnalysisResult[] typeAnalysisRes;
 
+    @CompilerDirectives.CompilationFinal
     private final boolean reifiedEnabled = true;
 
+    @CompilerDirectives.CompilationFinal
     public static final boolean DEBUG = false;
+    @CompilerDirectives.CompilationFinal
     public static final boolean SHOW_TYPEANALYSIS = true;
+    @CompilerDirectives.CompilationFinal
     public final boolean hasAttributes;
 
     public BytecodeNode(MethodVersion methodVersion) {
@@ -544,7 +549,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
         this.typeAnalysisRes = this.reifiedTypesCnt > 0 ? TypeHintAnalysis.analyze(methodVersion, SHOW_TYPEANALYSIS).getRes() : null;
         
-        methodReturnTypeAttribute = methodVersion.getMethod().getMethodReturnTypeAttribute();
+        MethodReturnTypeAttribute methodReturnTypeAttribute = methodVersion.getMethod().getMethodReturnTypeAttribute();
 
         this.hasAttributes = typeParamCntAttr != null ||
                              instTypeArgAttr != null ||
@@ -1597,9 +1602,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                 returnValue = getContext().getMeta().boxShort((short) returnValue); break;
                             case TypeHints.TypeA.BOOLEAN:
                                 returnValue = getContext().getMeta().boxBoolean((boolean) returnValue); break;
-                        }
-                        if (DEBUG && methodReturnTypeAttribute != null) {
-                            System.out.println("case RETURN: returning reified type: " + ((StaticObject) returnValue).toVerboseString() + "with reified value:" + returnTypeReifiedValue);
                         }
                         if (instrument != null) {
                             instrument.exitAt(frame, statementIndex, returnValue);

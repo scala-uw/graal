@@ -3,6 +3,7 @@ package com.oracle.truffle.espresso.classfile.attributes.reified;
 import java.util.Objects;
 
 import com.oracle.truffle.api.CompilerAsserts;
+import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.frame.VirtualFrame;
 
 public class TypeHints {
@@ -38,8 +39,11 @@ public class TypeHints {
         public static final TypeA TYPEA_REFERENCE =
             new TypeA(REFERENCE, 0);
 
+        @CompilerDirectives.CompilationFinal
         private final byte kind;
+        @CompilerDirectives.CompilationFinal
         private final int outerClassIndex;
+        @CompilerDirectives.CompilationFinal
         private final int index;
 
         public TypeA(byte kind, int index) {
@@ -94,8 +98,11 @@ public class TypeHints {
         public static final byte ARR_CLASS_TYPE_PARAM = 'k';
         public static final byte ARR_METHOD_TYPE_PARAM = 'm';
 
+        @CompilerDirectives.CompilationFinal
         private final byte kind;
+        @CompilerDirectives.CompilationFinal
         private final int outerClassIndex;
+        @CompilerDirectives.CompilationFinal
         private final int index;
 
         public TypeB(byte kind, int index, int outerClassIndex) {
