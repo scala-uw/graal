@@ -22,6 +22,7 @@
  */
 package com.oracle.truffle.espresso.nodes;
 
+import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.frame.Frame;
 import com.oracle.truffle.api.frame.FrameDescriptor;
@@ -53,15 +54,18 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
 
     @Child AbstractInstrumentableBytecodeNode bytecodeNode;
     @Children BytecodeNode[] specializations;
+    private final FrameDescriptor frameDescriptor;
 
     MethodWithBytecodeNode(BytecodeNode bytecodeNode) {
         super(bytecodeNode.getMethodVersion());
         this.bytecodeNode = bytecodeNode;
+        this.frameDescriptor = bytecodeNode.getFrameDescriptor();
         this.specializations = null;
     }
 
     MethodWithBytecodeNode(Method.MethodVersion methodVersion) {
         super(methodVersion);
+        CompilerAsserts.neverPartOfCompilation();
         MethodTypeParameterCountAttribute attr = methodVersion.getMethod().getMethodTypeParameterCountAttribute();
         if (attr != null) {
             assert attr.getCount() == 1;
@@ -71,18 +75,17 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
             for (int i = 0; i < TypeHints.TypeA.LIST_AVAILABLE.length; ++i) {
                 this.specializations[i] = new BytecodeNode(methodVersion, analysis, new byte[]{TypeHints.TypeA.LIST_AVAILABLE[i]});
             }
+            this.frameDescriptor = this.specializations[8].getFrameDescriptor();
         } else {
-            this.bytecodeNode = new BytecodeNode(methodVersion, null, new byte[]{});
+            BytecodeNode t = new BytecodeNode(methodVersion, null, new byte[]{});
+            this.bytecodeNode = t;
             this.specializations = null;
+            this.frameDescriptor = t.getFrameDescriptor();
         }
     }
 
     public FrameDescriptor getFrameDescriptor() {
-        if (bytecodeNode != null) {
-            return bytecodeNode.getFrameDescriptor();
-        } else {
-            return specializations[0].getFrameDescriptor();
-        }
+        return frameDescriptor;
     }
 
     @Override
@@ -98,9 +101,36 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
         } else {
             Object[] args = frame.getArguments();
             byte reified = (byte) args[args.length - 1];
-            int index = TypeHints.TypeA.findIndex(reified);
-            specializations[index].initializeFrame(frame);
-            return specializations[index].execute(frame);
+            switch (reified) {
+                case TypeHints.TypeA.BYTE: 
+                    specializations[0].initializeFrame(frame);
+                    return specializations[0].execute(frame);
+                case TypeHints.TypeA.CHAR:
+                    specializations[1].initializeFrame(frame);
+                    return specializations[1].execute(frame);
+                case TypeHints.TypeA.DOUBLE:
+                    specializations[2].initializeFrame(frame);
+                    return specializations[2].execute(frame);
+                case TypeHints.TypeA.FLOAT:
+                    specializations[3].initializeFrame(frame);
+                    return specializations[3].execute(frame);
+                case TypeHints.TypeA.INT:
+                    specializations[4].initializeFrame(frame);
+                    return specializations[4].execute(frame);
+                case TypeHints.TypeA.LONG:
+                    specializations[5].initializeFrame(frame);
+                    return specializations[5].execute(frame);
+                case TypeHints.TypeA.SHORT:
+                    specializations[6].initializeFrame(frame);
+                    return specializations[6].execute(frame);
+                case TypeHints.TypeA.BOOLEAN:
+                    specializations[7].initializeFrame(frame);
+                    return specializations[7].execute(frame);
+                default:
+                    assert reified == TypeHints.TypeA.REFERENCE; 
+                    specializations[8].initializeFrame(frame);
+                    return specializations[8].execute(frame);
+            }
         }
     }
 
@@ -108,7 +138,11 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
     @SuppressFBWarnings(value = "BC_IMPOSSIBLE_INSTANCEOF", justification = "bytecodeNode may be replaced by instrumentation with a wrapper node")
     boolean isTrivial() {
         // Instrumented nodes are not trivial.
-        return !(bytecodeNode instanceof WrapperNode) && bytecodeNode.isTrivial();
+        if (bytecodeNode != null) {
+            return !(bytecodeNode instanceof WrapperNode) && bytecodeNode.isTrivial();
+        } else {
+            return specializations[8].isTrivial();
+        }
     }
 
     @Override

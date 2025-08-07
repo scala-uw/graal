@@ -244,7 +244,7 @@ public abstract class EspressoRootNode extends RootNode implements ContextAccess
      */
     @TruffleBoundary
     public static EspressoRootNode createContinuable(Method.MethodVersion methodVersion, int bci, EspressoFrameDescriptor fd) {
-        BytecodeNode bytecodeNode = new BytecodeNode(methodVersion);
+        BytecodeNode bytecodeNode = new BytecodeNode(methodVersion, null, new byte[]{});
         return create(bytecodeNode.getFrameDescriptor(), new ContinuableMethodWithBytecode(bytecodeNode, bci, fd));
     }
 
