@@ -2,9 +2,7 @@ package com.oracle.truffle.espresso.classfile.attributes.reified;
 
 import java.util.Objects;
 
-import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.CompilerDirectives;
-import com.oracle.truffle.api.frame.VirtualFrame;
 
 public class TypeHints {
     public static class TypeA {
@@ -19,6 +17,23 @@ public class TypeHints {
         public static final byte REFERENCE = 'L';
         public static final byte CLASS_TYPE_PARAM = 'K';
         public static final byte METHOD_TYPE_PARAM = 'M';
+    
+        public static final byte[] LIST_AVAILABLE = new byte[]{BYTE, CHAR, DOUBLE, FLOAT, INT, LONG, SHORT, BOOLEAN, REFERENCE};
+        public static int findIndex(byte reified) {
+            switch (reified) {
+                case BYTE: return 0;
+                case CHAR: return 1;
+                case DOUBLE: return 2;
+                case FLOAT: return 3;
+                case INT: return 4;
+                case LONG: return 5;
+                case SHORT: return 6;
+                case BOOLEAN: return 7;
+                default:
+                    assert reified == REFERENCE; 
+                    return 8;
+            }
+        }
         
         public static final TypeA TYPEA_BYTE = 
             new TypeA(BYTE, 0);
@@ -66,6 +81,14 @@ public class TypeHints {
         public byte getKind() { return kind; }
         public int getOuterClassIndex() { return outerClassIndex; }
         public int getIndex() { return index; }
+
+        public byte resolve(byte[] methodTypeParams) {
+            if (this.kind == METHOD_TYPE_PARAM) {
+                return methodTypeParams[this.index];
+            } else if (this.kind == CLASS_TYPE_PARAM) {
+                return REFERENCE; // TODO: class type params
+            } else return this.kind;
+        }
 
         @Override
         public boolean equals(Object obj) {
@@ -116,34 +139,24 @@ public class TypeHints {
         public byte getKind() { return kind; }
         public int getOuterClassIndex() { return outerClassIndex; }
         public int getIndex() { return index; }
-
-        public static byte resolveReifiedType(TypeB typeBInstance, VirtualFrame frame, int startMethodTypeParams) {
-            if (typeBInstance == null) {
-                return TypeA.REFERENCE;
-            }
-            CompilerAsserts.partialEvaluationConstant(typeBInstance.kind);
-            CompilerAsserts.partialEvaluationConstant(typeBInstance.outerClassIndex);
-            CompilerAsserts.partialEvaluationConstant(typeBInstance.index);
-            if (typeBInstance.kind == METHOD_TYPE_PARAM) {
-                return (byte) frame.getIntStatic(startMethodTypeParams + typeBInstance.index);
-            } else if (typeBInstance.kind == CLASS_TYPE_PARAM) {
+        public boolean isGenericArray() { return kind == ARR_CLASS_TYPE_PARAM || kind == ARR_METHOD_TYPE_PARAM; }
+        
+        public byte resolve(byte[] methodTypeParams) {
+            if (this.kind == METHOD_TYPE_PARAM) {
+                return methodTypeParams[this.index];
+            } else if (this.kind == CLASS_TYPE_PARAM) {
                 return TypeA.REFERENCE; // TODO: class type params
             } else {
                 return TypeA.REFERENCE;
             }
         }
-
-        public static byte resolveArrayElementReifiedType(TypeB typeBInstance, VirtualFrame frame, int startMethodTypeParams) {
-            assert typeBInstance != null;
-            CompilerAsserts.partialEvaluationConstant(typeBInstance.kind);
-            CompilerAsserts.partialEvaluationConstant(typeBInstance.index);
-            byte kind = typeBInstance.kind;
+        
+        public byte resolveArrayElement(byte[] methodTypeParams) {
             assert kind == ARR_CLASS_TYPE_PARAM || kind == ARR_METHOD_TYPE_PARAM;
             if (kind == ARR_METHOD_TYPE_PARAM) {
-                return (byte) frame.getIntStatic(startMethodTypeParams + typeBInstance.index);
+                return methodTypeParams[index];
             } else {
-                // TODO: class type params
-                return TypeA.REFERENCE;
+                return TypeA.REFERENCE; // TODO: class type params
             }
         }
 

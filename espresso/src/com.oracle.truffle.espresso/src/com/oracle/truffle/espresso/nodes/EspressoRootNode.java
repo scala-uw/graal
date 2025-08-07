@@ -206,8 +206,8 @@ public abstract class EspressoRootNode extends RootNode implements ContextAccess
      * must be a concrete, non-native Java method.
      */
     public static EspressoRootNode createForBytecodes(Method.MethodVersion methodVersion) {
-        BytecodeNode bytecodeNode = new BytecodeNode(methodVersion);
-        return create(bytecodeNode.getFrameDescriptor(), new MethodWithBytecodeNode(bytecodeNode));
+        MethodWithBytecodeNode t = new MethodWithBytecodeNode(methodVersion);
+        return create(t.getFrameDescriptor(), t);
     }
 
     /**

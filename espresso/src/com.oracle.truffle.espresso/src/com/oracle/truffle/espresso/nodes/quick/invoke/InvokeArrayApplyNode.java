@@ -1,12 +1,10 @@
 package com.oracle.truffle.espresso.nodes.quick.invoke;
 
-import java.util.Arrays;
-
+import com.oracle.truffle.api.CompilerAsserts;
+import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.frame.VirtualFrame;
-import com.oracle.truffle.espresso.analysis.typehints.TypeAnalysisResult;
 import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.impl.Method;
-import com.oracle.truffle.espresso.nodes.BytecodeNode;
 import com.oracle.truffle.espresso.nodes.EspressoFrame;
 import com.oracle.truffle.espresso.runtime.staticobject.StaticObject;
 
@@ -15,28 +13,21 @@ public final class InvokeArrayApplyNode extends InvokeScalaNode {
     // array_apply takes two inputs: the array and the index.
     // The first operand is the array, which is expected to be of a specific type if this quick node is used
 
-    private final TypeHints.TypeB typeHint;
-    private final int frameStartReifiedTypes;
+    @CompilerDirectives.CompilationFinal private final byte arrayElementType;
 
-    public InvokeArrayApplyNode(Method method, int top, int callerBCI, TypeAnalysisResult typeAnalysis, int frameStartReifiedTypes) {
+    public InvokeArrayApplyNode(Method method, int top, int callerBCI, byte arrayElementReifiedType) {
         // array_apply is not annotated with attributes
         super(method, top, callerBCI);
-        TypeHints.TypeB[] operands = typeAnalysis.getOperandsTypes();
-        assert operands.length == 2 : "Expected two operands for InvokeArrayApplyNode, got " + Arrays.toString(operands);
-        assert operands[0] != null && operands[1] == null : "Expected first operand to be non-null and second to be null, got " + Arrays.toString(operands);
         assert !method.isStatic();
-        typeHint = operands[0];
-        this.frameStartReifiedTypes = frameStartReifiedTypes;
-        if (BytecodeNode.DEBUG) System.out.println("InvokeArrayApplyNode: typeHint=" + typeHint);
+        this.arrayElementType = arrayElementReifiedType;
     }
 
     @Override
     public int execute(VirtualFrame frame, boolean isContinuationResume) {
         StaticObject array = nullCheck(EspressoFrame.popObject(frame, top - 2));
         int index = EspressoFrame.popInt(frame, top - 1);
-        byte reifiedType = TypeHints.TypeB.resolveArrayElementReifiedType(typeHint, frame, frameStartReifiedTypes);
-        if (BytecodeNode.DEBUG) System.out.println("InvokeArrayApplyNode: array=" + array.toVerboseString() + ", index=" + index + ", reifiedType=" + reifiedType + " resultAt=" + resultAt);
-        switch (reifiedType) {
+        CompilerAsserts.partialEvaluationConstant(arrayElementType);
+        switch (arrayElementType) {
             case TypeHints.TypeA.BYTE:
                 byte b = getContext().getInterpreterToVM().getArrayByte(getLanguage(), index, array);
                 EspressoFrame.putInt(frame, resultAt, b);

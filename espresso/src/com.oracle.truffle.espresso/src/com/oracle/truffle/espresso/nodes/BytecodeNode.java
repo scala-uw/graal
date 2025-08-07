@@ -481,31 +481,27 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     private final int returnValueBci;
     private final int throwValueBci;
 
-    @CompilationFinal
-    private final int reifiedTypesCnt;
-    @CompilationFinal
-    private final int startReifiedTypes;
+    @CompilationFinal(dimensions = 1)
+    private final byte[] methodTypeParams;
     @CompilationFinal(dimensions = 2)
-    private final TypeHints.TypeA[][] instructionTypeArgHints;
+    private final byte[][] instructionTypeArgs;
     @CompilationFinal(dimensions = 1)
-    private final TypeHints.TypeB[] invokeReturnTypeHints;
+    private final byte[] invokeReturnTypes;
     @CompilationFinal(dimensions = 1)
-    private final TypeHints.TypeB[] methodParameterTypeHints;
-
+    private final byte[] methodParamTypes;
+    @CompilationFinal(dimensions = 2)
+    private final byte[][] instOperandTypes;
+    @CompilationFinal(dimensions = 2)
+    private final byte[][] instOperandArrayElementTypes;
     @CompilationFinal(dimensions = 1)
-    private final TypeAnalysisResult[] typeAnalysisRes;
-
-    @CompilerDirectives.CompilationFinal
-    private final boolean reifiedEnabled = true;
+    private final boolean[] isInvoke;
 
     @CompilerDirectives.CompilationFinal
     public static final boolean DEBUG = false;
     @CompilerDirectives.CompilationFinal
     public static final boolean SHOW_TYPEANALYSIS = true;
-    @CompilerDirectives.CompilationFinal
-    public final boolean hasAttributes;
 
-    public BytecodeNode(MethodVersion methodVersion) {
+    public BytecodeNode(MethodVersion methodVersion, TypeAnalysisResult[] instOperandTypeHints, byte[] reifiedMethodTypeParams) {
         CompilerAsserts.neverPartOfCompilation();
         Method method = methodVersion.getMethod();
         assert method.hasBytecodes();
@@ -518,46 +514,84 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         this.bs = new BytecodeStream(code);
         this.stackOverflowErrorInfo = method.getSOEHandlerInfo();
 
-        this.startReifiedTypes = startingReifiedTypesOffset(methodVersion.getMaxLocals());
-        MethodTypeParameterCountAttribute typeParamCntAttr = methodVersion.getMethod().getMethodTypeParameterCountAttribute();
-        this.reifiedTypesCnt = typeParamCntAttr != null ? typeParamCntAttr.getCount() : 0;
+        this.methodTypeParams = reifiedMethodTypeParams;
+
         int maxExtraStack = 0; // for passing reified types at invoke/new
-        this.instructionTypeArgHints = new TypeHints.TypeA[this.bs.endBCI()][];
+        this.instructionTypeArgs = new byte[this.bs.endBCI()][];
         InstructionTypeArgumentsAttribute instTypeArgAttr = methodVersion.getMethod().getInstructionTypeArgumentsAttribute();
         if (instTypeArgAttr != null) {
             for (InstructionTypeArgumentsAttribute.Entry entry : instTypeArgAttr.getEntries()) {
-                this.instructionTypeArgHints[entry.getBytecodeOffset()] = entry.getTypeArguments();
+                TypeHints.TypeA[] curTypeHints = entry.getTypeArguments();
+                byte[] curTypeArgs = new byte[curTypeHints.length];
+                for (int i = 0; i < curTypeHints.length; ++i) curTypeArgs[i] = curTypeHints[i].resolve(reifiedMethodTypeParams);
+                this.instructionTypeArgs[entry.getBytecodeOffset()] = curTypeArgs;
                 maxExtraStack = Math.max(maxExtraStack, entry.getTypeArguments().length);
             }
         }
 
         MethodParameterTypeAttribute methodParameterTypeAttribute = methodVersion.getMethod().getMethodParameterTypeAttribute();
         if (methodParameterTypeAttribute != null){
-            this.methodParameterTypeHints = methodParameterTypeAttribute.getParameterTypes();
+            TypeHints.TypeB[] methodParameterTypeHints = methodParameterTypeAttribute.getParameterTypes();
+            this.methodParamTypes = new byte[methodParameterTypeHints.length];
+            for (int i = 0; i < methodParameterTypeHints.length; ++i) {
+                if (methodParameterTypeHints[i] != null) {
+                    this.methodParamTypes[i] = methodParameterTypeHints[i].resolve(reifiedMethodTypeParams);
+                } else {
+                    this.methodParamTypes[i] = 0;
+                }
+            }
         } else {
-            this.methodParameterTypeHints = new TypeHints.TypeB[
-                SignatureSymbols.parameterCount(method.getParsedSignature())];
+            this.methodParamTypes = new byte[SignatureSymbols.parameterCount(method.getParsedSignature())];
+            for (int i = 0; i < methodParamTypes.length; ++i) methodParamTypes[i] = 0;
         }
 
-        this.invokeReturnTypeHints = new TypeHints.TypeB[this.bs.endBCI()];
+        this.invokeReturnTypes = new byte[this.bs.endBCI()];
+        for (int i = 0; i < invokeReturnTypes.length; ++i) invokeReturnTypes[i] = 0;
         InvokeReturnTypeAttribute invokeReturnTypeAttr = methodVersion.getMethod().getInvokeReturnTypeAttribute();
         if (invokeReturnTypeAttr != null) {
             for (InvokeReturnTypeAttribute.Entry entry : invokeReturnTypeAttr.getEntries()) {
-                this.invokeReturnTypeHints[entry.getBytecodeOffset()] = entry.getReturnType();
+                TypeHints.TypeB curReturnTypeHint = entry.getReturnType();
+                if (curReturnTypeHint != null) {
+                    invokeReturnTypes[entry.getBytecodeOffset()] = curReturnTypeHint.resolve(reifiedMethodTypeParams);
+                }
             }
         }
 
-        this.typeAnalysisRes = this.reifiedTypesCnt > 0 ? TypeHintAnalysis.analyze(methodVersion, SHOW_TYPEANALYSIS).getRes() : null;
-        
-        MethodReturnTypeAttribute methodReturnTypeAttribute = methodVersion.getMethod().getMethodReturnTypeAttribute();
+        //this.typeAnalysisRes = this.reifiedTypesCnt > 0 ? TypeHintAnalysis.analyze(methodVersion, SHOW_TYPEANALYSIS).getRes() : null;
+        if (instOperandTypeHints != null) {
+            this.instOperandTypes = new byte[instOperandTypeHints.length][];
+            this.instOperandArrayElementTypes = new byte[instOperandTypeHints.length][];
+            this.isInvoke = new boolean[instOperandTypeHints.length];
+            for (int i = 0; i < instOperandTypeHints.length; ++i) {
+                if (instOperandTypeHints[i] != null) {
+                    this.isInvoke[i] = instOperandTypeHints[i].isInvoke;
+                    int len = instOperandTypeHints[i].operands.length;
+                    instOperandTypes[i] = new byte[len];
+                    instOperandArrayElementTypes[i] = new byte[len];
+                    for (int j = 0; j < len; ++j) {
+                        if (instOperandTypeHints[i].operands[j] != null) {
+                            instOperandTypes[i][j] = instOperandTypeHints[i].operands[j].resolve(reifiedMethodTypeParams);
+                            if (instOperandTypeHints[i].operands[j].isGenericArray()) {
+                                instOperandArrayElementTypes[i][j] = instOperandTypeHints[i].operands[j].resolveArrayElement(reifiedMethodTypeParams);
+                            } else {
+                                instOperandArrayElementTypes[i][j] = 0;
+                            }
+                        } else {
+                            instOperandTypes[i][j] = 0;
+                            instOperandArrayElementTypes[i][j] = 0;
+                        }
+                    }
+                } else {
+                    this.isInvoke[i] = false;
+                }
+            }
+        } else {
+            this.instOperandTypes = new byte[this.bs.endBCI()][];
+            this.instOperandArrayElementTypes = new byte[this.bs.endBCI()][];
+            this.isInvoke = null;
+        }
 
-        this.hasAttributes = typeParamCntAttr != null ||
-                             instTypeArgAttr != null ||
-                             methodParameterTypeAttribute != null ||
-                             invokeReturnTypeAttr != null ||
-                             methodReturnTypeAttribute != null;
-
-        this.frameDescriptor = createFrameDescriptor(methodVersion.getMaxLocals() + this.reifiedTypesCnt, methodVersion.getMaxStackSize() + maxExtraStack);
+        this.frameDescriptor = createFrameDescriptor(methodVersion.getMaxLocals(), methodVersion.getMaxStackSize() + maxExtraStack);
         this.noForeignObjects = Truffle.getRuntime().createAssumption("noForeignObjects");
         this.implicitExceptionProfile = false;
         this.livenessAnalysis = methodVersion.getLivenessAnalysis();
@@ -599,7 +633,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
         Symbol<Type>[] methodSignature = getMethod().getParsedSignature();
         int argCount = SignatureSymbols.parameterCount(methodSignature);
-        assert methodParameterTypeHints.length == argCount: "parameter hints length different from argument length";
+        assert methodParamTypes.length == argCount: "parameter hints length different from argument length";
 
         CompilerAsserts.partialEvaluationConstant(argCount);
         for (int i = 0; i < argCount; ++i) {
@@ -617,66 +651,37 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 case '[' : // fall through
                 case 'L' : {
                     // Reference type. unbox refied values if annotated with type hints.
-                    if (reifiedEnabled){
-                        TypeHints.TypeB typeB = methodParameterTypeHints[i];
-                        if (typeB == null){
-                            StaticObject argument = (StaticObject) arguments[i + receiverSlot];
-                            setLocalObject(frame, curSlot, argument);
-                            checkNoForeignObjectAssumption(argument);
-                            break;
-                        } else {
-                            byte kind = typeB.getKind();
-                            int outerClassIndex = typeB.getOuterClassIndex();
-                            int index = typeB.getIndex();
-                            byte reifiedTypeValue = TypeHints.TypeA.REFERENCE;
-                            if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM){
-                                reifiedTypeValue = (byte) arguments[argCount + receiverSlot + index]; //TODO, CHECK THIS!!
-                            } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM){
-                                //TODO: class type params
-                            } // treat generic arrays as TypeA.REFERENCE
-                            StaticObject argument = (StaticObject) arguments[i + receiverSlot];
-                            switch (reifiedTypeValue){
-                                case TypeHints.TypeA.BYTE:
-                                    setLocalInt(frame, curSlot, getContext().getMeta().unboxByte(argument)); break;
-                                case TypeHints.TypeA.CHAR:
-                                    setLocalInt(frame, curSlot, getContext().getMeta().unboxCharacter(argument)); break;
-                                case TypeHints.TypeA.DOUBLE:
-                                    setLocalDouble(frame, curSlot, getContext().getMeta().unboxDouble(argument)); break;
-                                case TypeHints.TypeA.FLOAT:
-                                    setLocalFloat(frame, curSlot, getContext().getMeta().unboxFloat(argument)); break;
-                                case TypeHints.TypeA.INT:
-                                    setLocalInt(frame, curSlot, getContext().getMeta().unboxInteger(argument)); break;
-                                case TypeHints.TypeA.LONG:
-                                    setLocalLong(frame, curSlot, getContext().getMeta().unboxLong(argument)); break;
-                                case TypeHints.TypeA.SHORT:
-                                    setLocalInt(frame, curSlot, getContext().getMeta().unboxShort(argument)); break;
-                                case TypeHints.TypeA.BOOLEAN:
-                                    setLocalInt(frame, curSlot, getContext().getMeta().unboxBoolean(argument) ? 1 : 0); break;
-                                default:
-                                    setLocalObject(frame, curSlot, argument);
-                                    checkNoForeignObjectAssumption(argument);
-                                    break;
-                            }
-                            break;
-                        }
-                    } else {
                         StaticObject argument = (StaticObject) arguments[i + receiverSlot];
-                        setLocalObject(frame, curSlot, argument);
-                        checkNoForeignObjectAssumption(argument);
+                        CompilerAsserts.partialEvaluationConstant(methodParamTypes[i]);
+                        switch (methodParamTypes[i]){
+                            case TypeHints.TypeA.BYTE:
+                                setLocalInt(frame, curSlot, getContext().getMeta().unboxByte(argument)); break;
+                            case TypeHints.TypeA.CHAR:
+                                setLocalInt(frame, curSlot, getContext().getMeta().unboxCharacter(argument)); break;
+                            case TypeHints.TypeA.DOUBLE:
+                                setLocalDouble(frame, curSlot, getContext().getMeta().unboxDouble(argument)); break;
+                            case TypeHints.TypeA.FLOAT:
+                                setLocalFloat(frame, curSlot, getContext().getMeta().unboxFloat(argument)); break;
+                            case TypeHints.TypeA.INT:
+                                setLocalInt(frame, curSlot, getContext().getMeta().unboxInteger(argument)); break;
+                            case TypeHints.TypeA.LONG:
+                                setLocalLong(frame, curSlot, getContext().getMeta().unboxLong(argument)); break;
+                            case TypeHints.TypeA.SHORT:
+                                setLocalInt(frame, curSlot, getContext().getMeta().unboxShort(argument)); break;
+                            case TypeHints.TypeA.BOOLEAN:
+                                setLocalInt(frame, curSlot, getContext().getMeta().unboxBoolean(argument) ? 1 : 0); break;
+                            default:
+                                setLocalObject(frame, curSlot, argument);
+                                checkNoForeignObjectAssumption(argument);
+                                break;
+                        }
                         break;
-                    }
                 }
                 default :
                     CompilerDirectives.transferToInterpreterAndInvalidate();
                     throw EspressoError.shouldNotReachHere();
             }
             // @formatter:on
-            ++curSlot;
-        }
-        curSlot = startingReifiedTypesOffset(getMethodVersion().getMaxLocals());
-        assert arguments.length - argCount - receiverSlot == this.reifiedTypesCnt;
-        for (int i = argCount + receiverSlot; i < arguments.length; ++i) {
-            putInt(frame, curSlot, (byte) arguments[i]);
             ++curSlot;
         }
     }
@@ -844,7 +849,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
     @Override
     public Object execute(VirtualFrame frame) {
-        int startTop = startingStackOffset(getMethodVersion().getMaxLocals(), this.reifiedTypesCnt);
+        int startTop = startingStackOffset(getMethodVersion().getMaxLocals(), 0);
         if (methodVersion.hasJsr()) {
             getLanguage().getThreadLocalState().blockContinuationSuspension();
         }
@@ -856,10 +861,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 getLanguage().getThreadLocalState().unblockContinuationSuspension();
             }
         }
-    }
-
-    private static byte getReifiedTypeAt(VirtualFrame frame, int startReifiedTypes, int n) {
-        return (byte) frame.getIntStatic(startReifiedTypes + n);
     }
 
     @SuppressWarnings("DataFlowIssue")   // Too complex for IntelliJ to analyze.
@@ -881,7 +882,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         setBCI(frame, startBCI);
         int curBCI = startBCI;
         int top = startTop;
-        CompilerAsserts.partialEvaluationConstant(startReifiedTypes);
 
         if (instrument != null) {
             if (resumeContinuation) {
@@ -919,29 +919,15 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     setBCI(frame, curBCI);
                 }
 
-                if (DEBUG && hasAttributes) {
-                    System.out.println("BytecodeNode.executeBodyFromBCI: for method:" + getMethodVersion().getName().toString() + 
-                            " curBCI: " + curBCI + ", curOpcode: " + Bytecodes.nameOf(curOpcode) +
-                            ", top: " + top + ", statementIndex: " + statementIndex);
-                }
-                // get the type propagation operands
-                TypeHints.TypeB[] typePropagationOperands = null;
-                if (typeAnalysisRes != null){
-                    typePropagationOperands = typeAnalysisRes[curBCI] == null ? null : typeAnalysisRes[curBCI].getOperandsTypes();
-                }
-                CompilerAsserts.partialEvaluationConstant(typePropagationOperands);
 
                 // boxes the values if its an invoke using type propagation result
-                if (typeAnalysisRes != null) CompilerAsserts.partialEvaluationConstant(typeAnalysisRes[curBCI]);
-                if (typeAnalysisRes != null && typeAnalysisRes[curBCI] != null) {
-                    CompilerAsserts.partialEvaluationConstant(typeAnalysisRes[curBCI].isInvoke);
-                    if (typeAnalysisRes[curBCI].isInvoke) {
-                        TypeHints.TypeB[] typeBList = typeAnalysisRes[curBCI].operands;
-                        CompilerAsserts.partialEvaluationConstant(typeBList.length);
-                        for (int i = 0; i < typeBList.length; ++i) {
-                            int position = top - (typeBList.length - i);
-                            byte reifiedTypeValue = TypeHints.TypeB.resolveReifiedType(typeBList[i], frame, startReifiedTypes);
-                            switch (reifiedTypeValue) {
+                if (isInvoke != null && instOperandTypes[curBCI] != null) {
+                    CompilerAsserts.partialEvaluationConstant(isInvoke[curBCI]);
+                    if (isInvoke[curBCI]) {
+                        for (int i = 0; i < instOperandTypes[curBCI].length; ++i) {
+                            int position = top - (instOperandTypes[curBCI].length - i);
+                            CompilerAsserts.partialEvaluationConstant(instOperandTypes[curBCI][i]);
+                            switch (instOperandTypes[curBCI][i]) {
                                 case TypeHints.TypeA.BYTE:
                                     putObject(frame, position, getContext().getMeta().boxByte((byte) popInt(frame, position)));
                                     break;
@@ -973,20 +959,9 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 }
 
                 // put reified values on the stack as well
-                if (instructionTypeArgHints[curBCI] != null) {
-                    CompilerAsserts.partialEvaluationConstant(instructionTypeArgHints[curBCI].length);
-                    for (TypeHints.TypeA typeArg : instructionTypeArgHints[curBCI]) {
-                        // System.out.println("    curBCI: " + curBCI + ", curOpcode: " + Bytecodes.nameOf(curOpcode) +
-                        //         ", typeArg: " + typeArg + ", kind: " + (char) typeArg.getKind() + ", index: " + typeArg.getIndex());
-                        byte kind = typeArg.getKind();
-                        CompilerAsserts.partialEvaluationConstant(kind);
-                        if (kind == TypeHints.TypeA.METHOD_TYPE_PARAM) {
-                            putInt(frame, top, getReifiedTypeAt(frame, startingReifiedTypesOffset(methodVersion.getMaxLocals()), typeArg.getIndex()));
-                        } else if (kind == TypeHints.TypeA.CLASS_TYPE_PARAM) {
-                            // TODO
-                        } else {
-                            putInt(frame, top, kind);
-                        }
+                if (instructionTypeArgs[curBCI] != null) {
+                    for (byte typeValue : instructionTypeArgs[curBCI]){
+                        putInt(frame, top, typeValue);
                         ++top;
                     }
                 }
@@ -1050,11 +1025,9 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         } else {
                             aloadIndex = curOpcode - ALOAD_0;
                         }
-                        if (typePropagationOperands != null && reifiedEnabled) {
-                            assert typePropagationOperands.length == 1 : "Expected exactly one operand for ALOAD";
-                            TypeHints.TypeB typeB = typePropagationOperands[0];
-                            byte reifiedTypeValue = TypeHints.TypeB.resolveReifiedType(typeB, frame, startReifiedTypes);
-                            switch (reifiedTypeValue) {
+                        if (instOperandTypes[curBCI] != null) {
+                            assert instOperandTypes[curBCI].length == 1 : "Expected exactly one operand for ALOAD";
+                            switch (instOperandTypes[curBCI][0]) {
                                 case TypeHints.TypeA.BYTE:
                                     putInt(frame, top, (byte) getLocalInt(frame, aloadIndex));
                                     break;
@@ -1159,11 +1132,9 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         } else {
                             astoreIndex = curOpcode - ASTORE_0;
                         }
-                        if (typePropagationOperands != null && reifiedEnabled){
-                            assert typePropagationOperands.length == 1 : "Expected exactly one operand for ASTORE";
-                            TypeHints.TypeB typeB = typePropagationOperands[0];
-                            byte reifiedTypeValue = TypeHints.TypeB.resolveReifiedType(typeB, frame, startReifiedTypes);
-                            switch (reifiedTypeValue) {
+                        if (instOperandTypes[curBCI] != null){
+                            assert instOperandTypes[curBCI].length == 1 : "Expected exactly one operand for ASTORE";
+                            switch (instOperandTypes[curBCI][0]) {
                                 case TypeHints.TypeA.BYTE:
                                     setLocalInt(frame, astoreIndex, (byte) popInt(frame, top - 1));
                                     break;
@@ -1567,49 +1538,14 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         if (CompilerDirectives.hasNextTier() && loopCount.value > 0) {
                             LoopNode.reportLoopCount(this, loopCount.value);
                         }
-                        byte returnTypeReifiedValue = TypeHints.TypeA.REFERENCE;
-                        if (typePropagationOperands != null && reifiedEnabled){
-                            assert typePropagationOperands.length == 1 : "Expected one operand for return";
-                            TypeHints.TypeB typeB = typePropagationOperands[0];
-                            if (typeB != null){
-                                byte kind = typeB.getKind();
-                                int outerClassIndex = typeB.getOuterClassIndex();
-                                int index = typeB.getIndex();
-                                if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM) {
-                                    returnTypeReifiedValue = getReifiedTypeAt(frame, startReifiedTypes, index);
-                                } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM) {
-                                    // TODO 
-                                } else {
-                                    throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in ALOAD at BCI " + curBCI);
-                                }
-                            }
-                        }
-                        Object returnValue = getReturnValueAsObject(frame, top, returnTypeReifiedValue);
-                        switch (returnTypeReifiedValue){
-                            case TypeHints.TypeA.BYTE:
-                                returnValue = getContext().getMeta().boxByte((byte) returnValue); break;
-                            case TypeHints.TypeA.CHAR:
-                                returnValue = getContext().getMeta().boxCharacter((char) returnValue); break;
-                            case TypeHints.TypeA.DOUBLE:
-                                returnValue = getContext().getMeta().boxDouble((double) returnValue); break;
-                            case TypeHints.TypeA.FLOAT:
-                                returnValue = getContext().getMeta().boxFloat((float) returnValue); break;
-                            case TypeHints.TypeA.INT:
-                                returnValue = getContext().getMeta().boxInteger((int) returnValue); break;
-                            case TypeHints.TypeA.LONG:
-                                returnValue = getContext().getMeta().boxLong((long) returnValue); break;
-                            case TypeHints.TypeA.SHORT:
-                                returnValue = getContext().getMeta().boxShort((short) returnValue); break;
-                            case TypeHints.TypeA.BOOLEAN:
-                                returnValue = getContext().getMeta().boxBoolean((boolean) returnValue); break;
-                        }
+                        Object returnValue = getReturnValueAsObject(frame, top, curBCI);
                         if (instrument != null) {
                             instrument.exitAt(frame, statementIndex, returnValue);
                         }
 
                         // This branch must not be a loop exit.
                         // Let the next loop iteration return this
-                        top = startingStackOffset(getMethodVersion().getMaxLocals(), this.reifiedTypesCnt);
+                        top = startingStackOffset(getMethodVersion().getMaxLocals(), 0);
                         frame.setObjectStatic(top, returnValue);
                         top++;
                         curBCI = returnValueBci;
@@ -1831,7 +1767,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                          * (and thus lose partial-evaluation constants too early). When reached, the
                          * object at stack slot 0 should be returned.
                          */
-                        assert top == startingStackOffset(getMethodVersion().getMaxLocals(), this.reifiedTypesCnt) + 1;
+                        assert top == startingStackOffset(getMethodVersion().getMaxLocals(), 0) + 1;
                         assert curBCI == returnValueBci;
                         return frame.getObjectStatic(top - 1);
                     case THROW_VALUE:
@@ -1840,7 +1776,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                          * (and thus lose partial-evaluation constants too early). When reached, the
                          * object at stack slot 0 should be thrown.
                          */
-                        assert top == startingStackOffset(getMethodVersion().getMaxLocals(), this.reifiedTypesCnt) + 1;
+                        assert top == startingStackOffset(getMethodVersion().getMaxLocals(), 0) + 1;
                         assert curBCI == throwValueBci;
                         throw new ThrowOutOfInterpreterLoop((RuntimeException) frame.getObjectStatic(top - 1));
 
@@ -1859,7 +1795,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     instrument.notifyYieldAt(frame, unwindContinuationExceptionRequest.getContinuation(), statementIndex);
                 }
                 // This branch must not be a loop exit. Let the next loop iteration throw this
-                top = startingStackOffset(getMethodVersion().getMaxLocals(), this.reifiedTypesCnt);
+                top = startingStackOffset(getMethodVersion().getMaxLocals(), 0);
                 frame.setObjectStatic(top, unwindContinuationExceptionRequest);
                 top++;
                 curBCI = throwValueBci;
@@ -1887,7 +1823,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         for (int i = 0; i < stackOverflowErrorInfo.length; i += 3) {
                             if (curBCI >= stackOverflowErrorInfo[i] && curBCI < stackOverflowErrorInfo[i + 1]) {
                                 clearOperandStack(frame, top);
-                                top = startingStackOffset(getMethodVersion().getMaxLocals(), this.reifiedTypesCnt);
+                                top = startingStackOffset(getMethodVersion().getMaxLocals(), 0);
                                 putObject(frame, top, wrappedStackOverflowError.getGuestException());
                                 top++;
                                 int targetBCI = stackOverflowErrorInfo[i + 2];
@@ -1954,7 +1890,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         // on a different line than the exception point
                         TruffleStackTrace.fillIn(wrappedException);
                         clearOperandStack(frame, top);
-                        top = startingStackOffset(getMethodVersion().getMaxLocals(), this.reifiedTypesCnt);
+                        top = startingStackOffset(getMethodVersion().getMaxLocals(), 0);
                         checkNoForeignObjectAssumption(wrappedException.getGuestException());
                         putObject(frame, top, wrappedException.getGuestException());
                         top++;
@@ -1972,7 +1908,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
                         // This branch must not be a loop exit.
                         // Let the next loop iteration throw this
-                        top = startingStackOffset(getMethodVersion().getMaxLocals(), this.reifiedTypesCnt);
+                        top = startingStackOffset(getMethodVersion().getMaxLocals(), 0);
                         frame.setObjectStatic(top, wrappedException);
                         top++;
                         curBCI = throwValueBci;
@@ -1989,7 +1925,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 }
 
                 // This branch must not be a loop exit. Let the next loop iteration return this
-                top = startingStackOffset(getMethodVersion().getMaxLocals(), this.reifiedTypesCnt);
+                top = startingStackOffset(getMethodVersion().getMaxLocals(), 0);
                 frame.setObjectStatic(top, returnValue);
                 top++;
                 curBCI = returnValueBci;
@@ -1999,16 +1935,13 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             }
             assert curOpcode != WIDE && curOpcode != LOOKUPSWITCH && curOpcode != TABLESWITCH;
             // unbox the returned object to the reified type if the InvokeReturnTypeHint is Mn or Kn
-            if (typeAnalysisRes != null && typeAnalysisRes[curBCI] != null && 
-                typeAnalysisRes[curBCI].isInvoke && invokeReturnTypeHints[curBCI] != null){
+            if (isInvoke != null && 
+                isInvoke[curBCI] && invokeReturnTypes[curBCI] != 0){
                 assert top >= 1;
-                byte reifiedTypeValue = TypeHints.TypeB.resolveReifiedType(invokeReturnTypeHints[curBCI], frame, startReifiedTypes);
                 // need to add the stack effect of the opcode, then get the top object
                 int returnPosition = top + Bytecodes.stackEffectOf(curOpcode) - 1;
-                if (DEBUG && hasAttributes) System.out.println("returnPosition: " + returnPosition + ", top: " + top + ", stackEffect: " + Bytecodes.stackEffectOf(curOpcode));
                 StaticObject returnObject = peekObject(frame, returnPosition);
-                if (DEBUG && hasAttributes) System.out.println("case " + Bytecodes.nameOf(curOpcode) + ": returning reified type: " + returnObject.toVerboseString() + " with reified value: " + reifiedTypeValue);
-                switch (reifiedTypeValue){
+                switch (invokeReturnTypes[curBCI]){
                     case TypeHints.TypeA.BYTE:
                         putInt(frame, returnPosition, getContext().getMeta().unboxInteger(returnObject));
                         break;
@@ -2130,7 +2063,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         });
     }
 
-    private Object getReturnValueAsObject(VirtualFrame frame, int top, int returnTypeReifiedValue) {
+    private Object getReturnValueAsObject(VirtualFrame frame, int top, int curBCI) {
         Symbol<Type> returnType = SignatureSymbols.returnType(getMethod().getParsedSignature());
         // @formatter:off
         switch (returnType.byteAt(0)) {
@@ -2145,22 +2078,19 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             case 'V' : return StaticObject.NULL; // void
             case '[' : // fall through
             case 'L' : 
-                if (returnTypeReifiedValue == TypeHints.TypeA.BYTE){
-                    return (byte) popInt(frame, top - 1);
-                } else if (returnTypeReifiedValue == TypeHints.TypeA.CHAR){
-                    return (char) popInt(frame, top - 1);
-                } else if (returnTypeReifiedValue == TypeHints.TypeA.DOUBLE) {
-                    return popDouble(frame, top - 1);
-                } else if (returnTypeReifiedValue == TypeHints.TypeA.FLOAT) {
-                    return popFloat(frame, top - 1);
-                } else if (returnTypeReifiedValue == TypeHints.TypeA.INT){
-                    return popInt(frame, top - 1);
-                } else if (returnTypeReifiedValue == TypeHints.TypeA.LONG) {
-                    return popLong(frame, top - 1);
-                } else if (returnTypeReifiedValue == TypeHints.TypeA.SHORT){
-                    return (short) popInt(frame, top - 1);
-                } else if (returnTypeReifiedValue == TypeHints.TypeA.BOOLEAN){
-                    return stackIntToBoolean(popInt(frame, top - 1));
+                if (instOperandTypes[curBCI] != null) {
+                    assert instOperandTypes[curBCI].length == 1;
+                    switch (instOperandTypes[curBCI][0]) {
+                        case TypeHints.TypeA.BYTE: return getContext().getMeta().boxByte((byte) popInt(frame, top - 1));
+                        case TypeHints.TypeA.CHAR: return getContext().getMeta().boxCharacter((char) popInt(frame, top - 1));
+                        case TypeHints.TypeA.DOUBLE: return getContext().getMeta().boxDouble(popDouble(frame, top - 1));
+                        case TypeHints.TypeA.FLOAT: return getContext().getMeta().boxFloat(popFloat(frame, top - 1));
+                        case TypeHints.TypeA.INT: return getContext().getMeta().boxInteger(popInt(frame, top - 1));
+                        case TypeHints.TypeA.LONG: return getContext().getMeta().boxLong(popLong(frame, top - 1));
+                        case TypeHints.TypeA.SHORT: return getContext().getMeta().boxShort((short) popInt(frame, top - 1));
+                        case TypeHints.TypeA.BOOLEAN: return getContext().getMeta().boxBoolean(stackIntToBoolean(popInt(frame, top - 1)));
+                        default: return popObject(frame, top - 1);
+                    }
                 } else {
                     return popObject(frame, top - 1);
                 }
@@ -2173,7 +2103,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
     @ExplodeLoop
     private void clearOperandStack(VirtualFrame frame, int top) {
-        int stackStart = startingStackOffset(getMethodVersion().getMaxLocals(), this.reifiedTypesCnt);
+        int stackStart = startingStackOffset(getMethodVersion().getMaxLocals(), 0);
         for (int slot = top - 1; slot >= stackStart; --slot) {
             clear(frame, slot);
         }
@@ -2836,19 +2766,15 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         Method resolved = resolvedCall.getResolvedMethod();
         CallKind callKind = resolvedCall.getCallKind();
 
-        if (resolved.getNameAsString().equals("array_apply") && resolved.getDeclaringKlass().getNameAsString().equals("scala/runtime/ScalaRunTime$") && typeAnalysisRes != null){
-            if (DEBUG && hasAttributes) System.out.println("Dispatching quickened invoke for " + resolved.getNameAsString() + " for class:" + resolved.getDeclaringKlass().getNameAsString() + " at BCI: " + curBCI);
-            if (DEBUG && hasAttributes) System.out.println("type hint analysis:" + typeAnalysisRes[curBCI]);
-            TypeAnalysisResult typeAnalysis = typeAnalysisRes[curBCI];
-            if (typeAnalysis != null) {
-                return new InvokeArrayApplyNode(resolved, top, curBCI, typeAnalysis, startReifiedTypes);
+        if (resolved.getNameAsString().equals("array_apply") && resolved.getDeclaringKlass().getNameAsString().equals("scala/runtime/ScalaRunTime$")){
+            if (instOperandArrayElementTypes[curBCI] != null) {
+                assert instOperandArrayElementTypes[curBCI].length == 2;
+                return new InvokeArrayApplyNode(resolved, top, curBCI, instOperandArrayElementTypes[curBCI][0]);
             }
-        } else if (resolved.getNameAsString().equals("array_update") && resolved.getDeclaringKlass().getNameAsString().equals("scala/runtime/ScalaRunTime$") && typeAnalysisRes != null){
-            if (DEBUG && hasAttributes) System.out.println("Dispatching quickened invoke for " + resolved.getNameAsString() + " for class:" + resolved.getDeclaringKlass().getNameAsString() + " at BCI: " + curBCI);
-            if (DEBUG && hasAttributes) System.out.println("type hint analysis:" + typeAnalysisRes[curBCI]);
-            TypeAnalysisResult typeAnalysis = typeAnalysisRes[curBCI];
-            if (typeAnalysis != null) {
-                return new InvokeArrayUpdateNode(resolved, top, curBCI, typeAnalysis, startReifiedTypes);
+        } else if (resolved.getNameAsString().equals("array_update") && resolved.getDeclaringKlass().getNameAsString().equals("scala/runtime/ScalaRunTime$")){
+            if (instOperandArrayElementTypes[curBCI] != null) {
+                assert instOperandArrayElementTypes[curBCI].length == 3;
+                return new InvokeArrayUpdateNode(resolved, top, curBCI, instOperandArrayElementTypes[curBCI][0]);
             }
         }
 

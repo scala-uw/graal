@@ -22,8 +22,6 @@
  */
 package com.oracle.truffle.espresso.nodes;
 
-import java.util.Arrays;
-
 import com.oracle.truffle.api.CompilerAsserts;
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.frame.Frame;
@@ -32,7 +30,6 @@ import com.oracle.truffle.api.frame.FrameSlotKind;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.espresso.classfile.JavaKind;
-import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.classfile.descriptors.SignatureSymbols;
 import com.oracle.truffle.espresso.classfile.descriptors.Symbol;
 import com.oracle.truffle.espresso.classfile.descriptors.Type;
@@ -364,10 +361,6 @@ public final class EspressoFrame {
         StaticObject result = peekObject(frame, slot);
         assert result != null;
         return result;
-    }
-
-    private static byte getReifiedTypeAt(VirtualFrame frame, int startReifiedTypes, int n){
-        return (byte) frame.getIntStatic(startReifiedTypes + n);
     }
 
     @ExplodeLoop

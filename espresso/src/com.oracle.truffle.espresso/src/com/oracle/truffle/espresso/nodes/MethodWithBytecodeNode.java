@@ -24,6 +24,7 @@ package com.oracle.truffle.espresso.nodes;
 
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.frame.Frame;
+import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.StandardTags;
@@ -33,6 +34,11 @@ import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.interop.NodeLibrary;
 import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
+import com.oracle.truffle.espresso.analysis.typehints.TypeAnalysisResult;
+import com.oracle.truffle.espresso.analysis.typehints.TypeHintAnalysis;
+import com.oracle.truffle.espresso.classfile.attributes.reified.MethodTypeParameterCountAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
+import com.oracle.truffle.espresso.impl.Method;
 import com.oracle.truffle.espresso.impl.SuppressFBWarnings;
 
 /**
@@ -46,10 +52,37 @@ import com.oracle.truffle.espresso.impl.SuppressFBWarnings;
 final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
 
     @Child AbstractInstrumentableBytecodeNode bytecodeNode;
+    @Children BytecodeNode[] specializations;
 
     MethodWithBytecodeNode(BytecodeNode bytecodeNode) {
         super(bytecodeNode.getMethodVersion());
         this.bytecodeNode = bytecodeNode;
+        this.specializations = null;
+    }
+
+    MethodWithBytecodeNode(Method.MethodVersion methodVersion) {
+        super(methodVersion);
+        MethodTypeParameterCountAttribute attr = methodVersion.getMethod().getMethodTypeParameterCountAttribute();
+        if (attr != null) {
+            assert attr.getCount() == 1;
+            this.bytecodeNode = null;
+            TypeAnalysisResult[] analysis = TypeHintAnalysis.analyze(methodVersion, true).getRes();
+            this.specializations = new BytecodeNode[TypeHints.TypeA.LIST_AVAILABLE.length];
+            for (int i = 0; i < TypeHints.TypeA.LIST_AVAILABLE.length; ++i) {
+                this.specializations[i] = new BytecodeNode(methodVersion, analysis, new byte[]{TypeHints.TypeA.LIST_AVAILABLE[i]});
+            }
+        } else {
+            this.bytecodeNode = new BytecodeNode(methodVersion, null, new byte[]{});
+            this.specializations = null;
+        }
+    }
+
+    public FrameDescriptor getFrameDescriptor() {
+        if (bytecodeNode != null) {
+            return bytecodeNode.getFrameDescriptor();
+        } else {
+            return specializations[0].getFrameDescriptor();
+        }
     }
 
     @Override
@@ -59,8 +92,16 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
 
     @Override
     Object execute(VirtualFrame frame) {
-        bytecodeNode.initializeFrame(frame);
-        return bytecodeNode.execute(frame);
+        if (bytecodeNode != null) {
+            bytecodeNode.initializeFrame(frame);
+            return bytecodeNode.execute(frame);
+        } else {
+            Object[] args = frame.getArguments();
+            byte reified = (byte) args[args.length - 1];
+            int index = TypeHints.TypeA.findIndex(reified);
+            specializations[index].initializeFrame(frame);
+            return specializations[index].execute(frame);
+        }
     }
 
     @Override
