@@ -23,6 +23,7 @@
 package com.oracle.truffle.espresso.nodes;
 
 import com.oracle.truffle.api.CompilerAsserts;
+import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.frame.Frame;
 import com.oracle.truffle.api.frame.FrameDescriptor;
@@ -55,6 +56,8 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
     @Child AbstractInstrumentableBytecodeNode bytecodeNode;
     @Children BytecodeNode[] specializations;
     private final FrameDescriptor frameDescriptor;
+    @CompilerDirectives.CompilationFinal
+    public static final boolean SHOW_TYPEANALYSIS = false;
 
     MethodWithBytecodeNode(BytecodeNode bytecodeNode) {
         super(bytecodeNode.getMethodVersion());
@@ -70,7 +73,7 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
         if (attr != null) {
             assert attr.getCount() == 1;
             this.bytecodeNode = null;
-            TypeAnalysisResult[] analysis = TypeHintAnalysis.analyze(methodVersion, true).getRes();
+            TypeAnalysisResult[] analysis = TypeHintAnalysis.analyze(methodVersion, SHOW_TYPEANALYSIS).getRes();
             this.specializations = new BytecodeNode[TypeHints.TypeA.LIST_AVAILABLE.length];
             for (int i = 0; i < TypeHints.TypeA.LIST_AVAILABLE.length; ++i) {
                 this.specializations[i] = new BytecodeNode(methodVersion, analysis, new byte[]{TypeHints.TypeA.LIST_AVAILABLE[i]});

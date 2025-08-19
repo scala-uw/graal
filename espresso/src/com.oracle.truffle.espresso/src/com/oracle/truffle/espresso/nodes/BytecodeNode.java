@@ -494,8 +494,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
     @CompilerDirectives.CompilationFinal
     public static final boolean DEBUG = false;
-    @CompilerDirectives.CompilationFinal
-    public static final boolean SHOW_TYPEANALYSIS = true;
 
     public BytecodeNode(MethodVersion methodVersion, TypeAnalysisResult[] instOperandTypeHints, byte[] reifiedMethodTypeParams) {
         CompilerAsserts.neverPartOfCompilation();
@@ -554,9 +552,11 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         }
 
         //this.typeAnalysisRes = this.reifiedTypesCnt > 0 ? TypeHintAnalysis.analyze(methodVersion, SHOW_TYPEANALYSIS).getRes() : null;
+        this.instOperandTypes = new byte[this.bs.endBCI()][];
+        this.instOperandArrayElementTypes = new byte[this.bs.endBCI()][];
         if (instOperandTypeHints != null) {
-            this.instOperandTypes = new byte[instOperandTypeHints.length][];
-            this.instOperandArrayElementTypes = new byte[instOperandTypeHints.length][];
+            // this.instOperandTypes = new byte[instOperandTypeHints.length][];
+            // this.instOperandArrayElementTypes = new byte[instOperandTypeHints.length][];
             this.isInvoke = new boolean[instOperandTypeHints.length];
             for (int i = 0; i < instOperandTypeHints.length; ++i) {
                 if (instOperandTypeHints[i] != null) {
@@ -582,8 +582,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 }
             }
         } else {
-            this.instOperandTypes = new byte[this.bs.endBCI()][];
-            this.instOperandArrayElementTypes = new byte[this.bs.endBCI()][];
+            // this.instOperandTypes = new byte[this.bs.endBCI()][];
+            // this.instOperandArrayElementTypes = new byte[this.bs.endBCI()][];
             this.isInvoke = null;
         }
 
