@@ -373,6 +373,7 @@ import com.oracle.truffle.espresso.nodes.quick.interop.ReferenceArrayStoreQuickN
 import com.oracle.truffle.espresso.nodes.quick.interop.ShortArrayLoadQuickNode;
 import com.oracle.truffle.espresso.nodes.quick.interop.ShortArrayStoreQuickNode;
 import com.oracle.truffle.espresso.nodes.quick.invoke.InvokeArrayApplyNode;
+import com.oracle.truffle.espresso.nodes.quick.invoke.InvokeArrayLengthNode;
 import com.oracle.truffle.espresso.nodes.quick.invoke.InvokeArrayUpdateNode;
 import com.oracle.truffle.espresso.nodes.quick.invoke.InvokeContinuableNode;
 import com.oracle.truffle.espresso.nodes.quick.invoke.InvokeDynamicCallSiteNode;
@@ -2797,6 +2798,11 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             if (instOperandArrayElementTypes[curBCI] != null) {
                 assert instOperandArrayElementTypes[curBCI].length == 3;
                 return new InvokeArrayUpdateNode(resolved, top, curBCI, instOperandArrayElementTypes[curBCI][0]);
+            }
+        } else if (resolved.getNameAsString().equals("array_length") && resolved.getDeclaringKlass().getNameAsString().equals("scala/runtime/ScalaRunTime$")){
+            if (instOperandArrayElementTypes[curBCI] != null) {
+                assert instOperandArrayElementTypes[curBCI].length == 1;
+                return new InvokeArrayLengthNode(resolved, top, curBCI, instOperandArrayElementTypes[curBCI][0]);
             }
         }
 

@@ -30,35 +30,35 @@ public final class InvokeArrayApplyNode extends InvokeScalaNode {
         switch (arrayElementType) {
             case TypeHints.TypeA.BYTE:
                 byte b = getContext().getInterpreterToVM().getArrayByte(getLanguage(), index, array);
-                EspressoFrame.putInt(frame, resultAt, b);
+                EspressoFrame.putObject(frame, resultAt, getMeta().boxByte(b));
                 break;
             case TypeHints.TypeA.CHAR:
                 char c = getContext().getInterpreterToVM().getArrayChar(getLanguage(), index, array);
-                EspressoFrame.putInt(frame, resultAt, c);
+                EspressoFrame.putObject(frame, resultAt, getMeta().boxCharacter(c));
                 break;
             case TypeHints.TypeA.DOUBLE:
                 double d = getContext().getInterpreterToVM().getArrayDouble(getLanguage(), index, array);
-                EspressoFrame.putReifiedDouble(frame, resultAt, d);
+                EspressoFrame.putObject(frame, resultAt, getMeta().boxDouble(d));
                 break;
             case TypeHints.TypeA.FLOAT:
                 float f = getContext().getInterpreterToVM().getArrayFloat(getLanguage(), index, array);
-                EspressoFrame.putFloat(frame, resultAt, f);
+                EspressoFrame.putObject(frame, resultAt, getMeta().boxFloat(f));
                 break;
             case TypeHints.TypeA.INT:
                 int i = getContext().getInterpreterToVM().getArrayInt(getLanguage(), index, array);
-                EspressoFrame.putInt(frame, resultAt, i);
+                EspressoFrame.putObject(frame, resultAt, getMeta().boxInteger(i));
                 break;
             case TypeHints.TypeA.LONG:
                 long l = getContext().getInterpreterToVM().getArrayLong(getLanguage(), index, array);
-                EspressoFrame.putReifiedLong(frame, resultAt, l);
+                EspressoFrame.putObject(frame, resultAt, getMeta().boxLong(l));
                 break;
             case TypeHints.TypeA.SHORT:
                 short s = getContext().getInterpreterToVM().getArrayShort(getLanguage(), index, array);
-                EspressoFrame.putInt(frame, resultAt, s);
+                EspressoFrame.putObject(frame, resultAt, getMeta().boxShort(s));
                 break;
             case TypeHints.TypeA.BOOLEAN:
                 byte bool = getContext().getInterpreterToVM().getArrayByte(getLanguage(), index, array);
-                EspressoFrame.putInt(frame, resultAt, bool);
+                EspressoFrame.putObject(frame, resultAt, getMeta().boxBoolean(bool != 0));
                 break;
             default:
                 EspressoFrame.putObject(frame, resultAt, getContext().getInterpreterToVM().getArrayObject(getLanguage(), index, array));

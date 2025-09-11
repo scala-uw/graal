@@ -27,44 +27,36 @@ public final class InvokeArrayUpdateNode extends InvokeScalaNode {
     public int execute(VirtualFrame frame, boolean isContinuationResume) {
         StaticObject array = nullCheck(EspressoFrame.popObject(frame, top - 3));
         int index = EspressoFrame.popInt(frame, top - 2);
+        StaticObject newElement = EspressoFrame.popObject(frame, top - 1);
         //System.out.println("InvokeArrayUpdateNode: array=" + array.toVerboseString() + ", index=" + index + ", newElement=" + newElement.toVerboseString() + ", reifiedType=" + reifiedType + " resultAt=" + resultAt);
         EspressoLanguage language = getLanguage();
         CompilerAsserts.partialEvaluationConstant(arrayElementType);
         switch (arrayElementType) {
             case TypeHints.TypeA.BYTE:
-                byte newByte = (byte) EspressoFrame.popInt(frame, top - 1);
-                getContext().getInterpreterToVM().setArrayByte(language, newByte, index, array);
+                getContext().getInterpreterToVM().setArrayByte(language, getMeta().unboxByte(newElement), index, array);
                 break;
             case TypeHints.TypeA.CHAR:
-                char newChar = (char) EspressoFrame.popInt(frame, top - 1);
-                getContext().getInterpreterToVM().setArrayChar(language, newChar, index, array);
+                getContext().getInterpreterToVM().setArrayChar(language, getMeta().unboxCharacter(newElement), index, array);
                 break;
             case TypeHints.TypeA.DOUBLE:
-                double newDouble = EspressoFrame.popDouble(frame, top - 1);
-                getContext().getInterpreterToVM().setArrayDouble(language, newDouble, index, array);
+                getContext().getInterpreterToVM().setArrayDouble(language, getMeta().unboxDouble(newElement), index, array);
                 break;
             case TypeHints.TypeA.FLOAT:
-                float newFloat = EspressoFrame.popFloat(frame, top - 1);
-                getContext().getInterpreterToVM().setArrayFloat(language, newFloat, index, array);
+                getContext().getInterpreterToVM().setArrayFloat(language, getMeta().unboxFloat(newElement), index, array);
                 break;
             case TypeHints.TypeA.INT:
-                int newInt = EspressoFrame.popInt(frame, top - 1);
-                getContext().getInterpreterToVM().setArrayInt(language, newInt, index, array);
+                getContext().getInterpreterToVM().setArrayInt(language, getMeta().unboxInteger(newElement), index, array);
                 break;
             case TypeHints.TypeA.LONG:
-                long newLong = EspressoFrame.popLong(frame, top - 1);
-                getContext().getInterpreterToVM().setArrayLong(language, newLong, index, array);
+                getContext().getInterpreterToVM().setArrayLong(language, getMeta().unboxLong(newElement), index, array);
                 break;
             case TypeHints.TypeA.SHORT:
-                short newShort = (short) EspressoFrame.popInt(frame, top - 1);
-                getContext().getInterpreterToVM().setArrayShort(language, newShort, index, array);
+                getContext().getInterpreterToVM().setArrayShort(language, getMeta().unboxShort(newElement), index, array);
                 break;
             case TypeHints.TypeA.BOOLEAN:
-                byte newBool = (byte) EspressoFrame.popInt(frame, top - 1);
-                getContext().getInterpreterToVM().setArrayByte(language, newBool, index, array);
+                getContext().getInterpreterToVM().setArrayByte(language, (byte) (getMeta().unboxBoolean(newElement) ? 1 : 0), index, array);
                 break;
             default:
-                StaticObject newElement = EspressoFrame.popObject(frame, top - 1);
                 getContext().getInterpreterToVM().setArrayObject(language, newElement, index, array);
                 break;
         }
