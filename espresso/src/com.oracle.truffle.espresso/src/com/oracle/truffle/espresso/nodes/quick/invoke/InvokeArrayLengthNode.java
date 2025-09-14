@@ -25,8 +25,9 @@ public final class InvokeArrayLengthNode extends InvokeScalaNode {
     @Override
     public int execute(VirtualFrame frame, boolean isContinuationResume) {
         StaticObject array = nullCheck(EspressoFrame.popObject(frame, top - 1));
+        int arrayLength = InterpreterToVM.arrayLength(array, getLanguage());
         CompilerAsserts.partialEvaluationConstant(arrayElementType);
-        EspressoFrame.putInt(frame, top - 1, InterpreterToVM.arrayLength(array, getLanguage()));
+        EspressoFrame.putInt(frame, resultAt, arrayLength);
         return stackEffect;
     }
   
