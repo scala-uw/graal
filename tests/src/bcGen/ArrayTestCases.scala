@@ -13,6 +13,12 @@ object testArray{
   val intDoubleArr : Array[Any] = Array.tabulate(size * 2) { i =>
     if (rng.nextInt % 2 == 0) rng.nextInt(maxInt) else rng.nextDouble()
   }
+  val shortArrInt = Array.fill[Int](10)(rng.nextInt(maxInt))
+  val shortArrDouble = Array.fill[Double](10)(rng.nextDouble())
+  val shortArrObj = Array.fill[Any](10)(new bcGen.Foo(rng.nextInt(maxInt)))
+  val shorArrIntCp = new Array[Int](10)
+  val shorArrDoubleCp = new Array[Double](10)
+  val shorArrObjCp = new Array[Any](10)
   val intArrCp = new Array[Int](size)
   val anyArrCp = new Array[Any](size)
   val doubleArrCp = new Array[Double](size)
@@ -88,6 +94,17 @@ object testArray{
       sum += ArrayTestLib.checksum[Int](intArr)
       i += 1
     println(sum)
+
+  @main def runChecksumInt2(): Unit =
+    var i = 0
+    while (i < shortArrInt.length) do {
+      println(shortArrInt(i) + " : " + shortArrInt(i).##)
+      i += 1
+    }
+    val sum = ArrayTestLib.checksum[Int](shortArrInt)
+    println(sum)
+    val sum2 = ArrayTestLib.checksum[Int](shortArrInt)
+    println(sum2)
   
   @main def runAllArr(): Unit =
     val repeat = 1000
