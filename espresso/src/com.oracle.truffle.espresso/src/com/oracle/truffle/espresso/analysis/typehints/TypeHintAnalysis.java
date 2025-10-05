@@ -6,11 +6,12 @@ import com.oracle.truffle.espresso.analysis.GraphBuilder;
 import com.oracle.truffle.espresso.analysis.graph.Graph;
 import com.oracle.truffle.espresso.analysis.graph.LinkedBlock;
 import com.oracle.truffle.espresso.impl.Method;
+import com.oracle.truffle.espresso.nodes.BytecodeNode;
 import com.oracle.truffle.espresso.runtime.EspressoContext;
 
 
 public class TypeHintAnalysis {
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = false || BytecodeNode.DEBUG;
     public static TypeHintAnalysis analyze(Method.MethodVersion methodVersion, boolean showTypeAnalysis) {
         Method method = methodVersion.getMethod();
         Graph<? extends LinkedBlock> graph = GraphBuilder.build(method);

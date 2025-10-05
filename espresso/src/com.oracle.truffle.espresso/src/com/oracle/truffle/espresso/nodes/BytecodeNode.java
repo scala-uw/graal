@@ -495,6 +495,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
     @CompilerDirectives.CompilationFinal
     public static final boolean DEBUG = false;
+    public final boolean hasAttributes;
 
     public BytecodeNode(MethodVersion methodVersion, TypeAnalysisResult[] instOperandTypeHints, byte[] reifiedMethodTypeParams) {
         CompilerAsserts.neverPartOfCompilation();
@@ -515,6 +516,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         this.instructionTypeArgs = new byte[this.bs.endBCI()][];
         InstructionTypeArgumentsAttribute instTypeArgAttr = methodVersion.getMethod().getInstructionTypeArgumentsAttribute();
         if (instTypeArgAttr != null) {
+            if (DEBUG) System.out.println("Method " + method.getNameAsString() + " instr type arguments:" + instTypeArgAttr);
             for (InstructionTypeArgumentsAttribute.Entry entry : instTypeArgAttr.getEntries()) {
                 TypeHints.TypeA[] curTypeHints = entry.getTypeArguments();
                 byte[] curTypeArgs = new byte[curTypeHints.length];
@@ -526,6 +528,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
         MethodParameterTypeAttribute methodParameterTypeAttribute = methodVersion.getMethod().getMethodParameterTypeAttribute();
         if (methodParameterTypeAttribute != null){
+            if (DEBUG) System.out.println("Method " + method.getNameAsString() + " method param type:" + methodParameterTypeAttribute);
             TypeHints.TypeB[] methodParameterTypeHints = methodParameterTypeAttribute.getParameterTypes();
             this.methodParamTypes = new byte[methodParameterTypeHints.length];
             for (int i = 0; i < methodParameterTypeHints.length; ++i) {
@@ -544,6 +547,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         for (int i = 0; i < invokeReturnTypes.length; ++i) invokeReturnTypes[i] = 0;
         InvokeReturnTypeAttribute invokeReturnTypeAttr = methodVersion.getMethod().getInvokeReturnTypeAttribute();
         if (invokeReturnTypeAttr != null) {
+            if (DEBUG) System.out.println("Method " + method.getNameAsString() + " invoke return type:" + invokeReturnTypeAttr);
             for (InvokeReturnTypeAttribute.Entry entry : invokeReturnTypeAttr.getEntries()) {
                 TypeHints.TypeB curReturnTypeHint = entry.getReturnType();
                 if (curReturnTypeHint != null) {
@@ -595,6 +599,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         this.trivialBytecodesCache = originalCode.length <= method.getContext().getEspressoEnv().TrivialMethodSize
                         ? TRIVIAL_UNINITIALIZED
                         : TRIVIAL_NO;
+
+        hasAttributes = instTypeArgAttr != null || methodParameterTypeAttribute != null || invokeReturnTypeAttr != null;
     }
 
     public FrameDescriptor getFrameDescriptor() {
@@ -989,6 +995,10 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             livenessAnalysis.onStart(frame, skipLivenessActions);
         }
 
+        if (DEBUG && hasAttributes) {
+            System.out.println("---- Method " + getMethod().getName() + " " + getMethod().getDeclaringClass().getName() + " ----");
+        }
+
         loop: while (true) {
             final int curOpcode = bs.opcode(curBCI);
             EXECUTED_BYTECODES_COUNT.inc();
@@ -1000,6 +1010,10 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 CompilerAsserts.partialEvaluationConstant(statementIndex);
                 assert statementIndex == InstrumentationSupport.NO_STATEMENT || curBCI == returnValueBci || curBCI == throwValueBci ||
                                 statementIndex == instrumentation.hookBCIToNodeIndex.lookupBucket(curBCI);
+                
+                if (DEBUG && hasAttributes) {
+                    System.out.println("BCI: " + curBCI + " " + Bytecodes.nameOf(curOpcode) + " top: " + top);
+                }
 
                 if (instrument != null || Bytecodes.canTrap(curOpcode)) {
                     /*
