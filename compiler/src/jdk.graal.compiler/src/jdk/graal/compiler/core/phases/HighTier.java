@@ -43,6 +43,7 @@ import jdk.graal.compiler.phases.common.CanonicalizerPhase;
 import jdk.graal.compiler.phases.common.DeadCodeEliminationPhase;
 import jdk.graal.compiler.phases.common.DisableOverflownCountedLoopsPhase;
 import jdk.graal.compiler.phases.common.DominatorBasedGlobalValueNumberingPhase;
+import jdk.graal.compiler.phases.common.GuestBoxingPhase;
 import jdk.graal.compiler.phases.common.HighTierLoweringPhase;
 import jdk.graal.compiler.phases.common.IterativeConditionalEliminationPhase;
 import jdk.graal.compiler.phases.common.inlining.InliningPhase;
@@ -66,6 +67,7 @@ public class HighTier extends BaseTier<HighTierContext> {
     public HighTier(OptionValues options) {
         CanonicalizerPhase canonicalizer = CanonicalizerPhase.create();
         appendPhase(canonicalizer);
+        appendPhase(new GuestBoxingPhase());
 
         if (Options.Inline.getValue(options)) {
             appendPhase(new InliningPhase(new GreedyInliningPolicy(null), canonicalizer));
