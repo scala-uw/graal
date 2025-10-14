@@ -101,7 +101,7 @@ final class LibGraalTruffleHostEnvironment extends TruffleHostEnvironment {
         protected HostMethodInfo computeValue(ResolvedJavaMethod method) {
             TruffleKnownHostTypes hostTypes = types();
             List<AnnotationData> annotationDataList = method.getAnnotationData(hostTypes.TruffleBoundary, hostTypes.BytecodeInterpreterSwitch,
-                            hostTypes.BytecodeInterpreterSwitchBoundary, hostTypes.InliningCutoff);
+                            hostTypes.BytecodeInterpreterSwitchBoundary, hostTypes.InliningCutoff, hostTypes.GuestBoxing, hostTypes.GuestUnboxing);
             boolean isTruffleBoundary = false;
             boolean isBytecodeInterpreterSwitch = false;
             boolean isBytecodeInterpreterSwitchBoundary = false;
