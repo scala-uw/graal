@@ -71,6 +71,7 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 import com.oracle.truffle.api.source.Source;
+
 import org.graalvm.collections.EconomicMap;
 import org.graalvm.collections.UnmodifiableEconomicMap;
 import org.graalvm.home.Version;
@@ -115,6 +116,8 @@ import com.oracle.truffle.api.impl.FrameWithoutBoxing;
 import com.oracle.truffle.api.impl.TVMCI;
 import com.oracle.truffle.api.impl.ThreadLocalHandshake;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
+import com.oracle.truffle.api.nodes.GuestBoxing;
+import com.oracle.truffle.api.nodes.GuestUnboxing;
 import com.oracle.truffle.api.nodes.LoopNode;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.Node.Child;
@@ -539,7 +542,9 @@ public abstract class OptimizedTruffleRuntime implements TruffleRuntime, Truffle
         return new HostMethodInfo(isTruffleBoundary(method),
                         isBytecodeInterpreterSwitch(method),
                         isBytecodeInterpreterSwitchBoundary(method),
-                        isInliningCutoff(method));
+                        isInliningCutoff(method),
+                        isGuestBoxing(method),
+                        isGuestUnboxing(method));
     }
 
     private static boolean isBytecodeInterpreterSwitch(ResolvedJavaMethod method) {
@@ -557,6 +562,20 @@ public abstract class OptimizedTruffleRuntime implements TruffleRuntime, Truffle
 
     private static boolean isTruffleBoundary(ResolvedJavaMethod method) {
         return getAnnotation(TruffleBoundary.class, method) != null;
+    }
+
+    private static boolean isGuestBoxing(ResolvedJavaMethod method) {
+        if (getAnnotation(GuestBoxing.class, method) != null) {
+            System.out.println("GuestBoxing found");
+        }
+        return getAnnotation(GuestBoxing.class, method) != null;
+    }
+
+    private static boolean isGuestUnboxing(ResolvedJavaMethod method) {
+        if (getAnnotation(GuestUnboxing.class, method) != null) {
+            System.out.println("GuestUnboxing found");
+        }
+        return getAnnotation(GuestUnboxing.class, method) != null;
     }
 
     @Override

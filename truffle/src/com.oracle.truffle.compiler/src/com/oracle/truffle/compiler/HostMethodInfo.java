@@ -55,6 +55,8 @@ public record HostMethodInfo(
                 boolean isTruffleBoundary,
                 boolean isBytecodeInterpreterSwitch,
                 boolean isBytecodeInterpreterSwitchBoundary,
-                boolean isInliningCutoff) {
+                boolean isInliningCutoff,
+                boolean isGuestBoxing,
+                boolean isGuestUnboxing) {
 
 }

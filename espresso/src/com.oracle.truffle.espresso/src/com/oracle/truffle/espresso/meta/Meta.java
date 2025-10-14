@@ -3005,6 +3005,7 @@ public final class Meta extends ContextAccessImpl
         return (float) java_lang_Float_value.get(boxed);
     }
 
+    @TruffleBoundary
     @GuestUnboxing
     public int unboxInteger(@JavaType(Integer.class) StaticObject boxed) {
         if (StaticObject.isNull(boxed) || boxed.getKlass() != java_lang_Integer) {
@@ -3058,6 +3059,7 @@ public final class Meta extends ContextAccessImpl
         return (StaticObject) java_lang_Float_valueOf.invokeDirectStatic(value);
     }
 
+    @TruffleBoundary
     @GuestBoxing
     public @JavaType(Integer.class) StaticObject boxInteger(int value) {
         return (StaticObject) java_lang_Integer_valueOf.invokeDirectStatic(value);
