@@ -20,7 +20,7 @@ public class GuestBoxingPhase extends Phase {
         TruffleHostEnvironment env = TruffleHostEnvironment.get(graph.method());
         if (env == null) return;
         HostMethodInfo info = env.getHostMethodInfo(graph.method());
-        if (graph.toString().indexOf("unboxInteger") >= 0) System.out.println(graph.toString() + ": " + info.isGuestBoxing() + info.isGuestUnboxing());
+        if (graph.toString().indexOf("unboxInteger") >= 0) System.out.println(graph.toString() + ": " + env.getClass().getName() + info.isGuestBoxing() + info.isGuestUnboxing());
         if (info.isGuestBoxing() || info.isGuestUnboxing()) System.out.println(graph.toString());
     }
 

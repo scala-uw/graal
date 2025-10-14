@@ -126,6 +126,13 @@ final class LibGraalTruffleHostEnvironment extends TruffleHostEnvironment {
                     isGuestUnboxing = true;
                 }
             }
+            if (method.getName().indexOf("unboxInteger") >= 0) {
+                System.out.println(hostTypes.GuestBoxing.getName());
+                System.out.println(hostTypes.GuestUnboxing.getName());
+                for (AnnotationData annotationData : annotationDataList) {
+                    System.out.println(annotationData.getAnnotationType().getName());
+                }
+            }
             return new HostMethodInfo(isTruffleBoundary, isBytecodeInterpreterSwitch, isBytecodeInterpreterSwitchBoundary, isInliningCutoff, isGuestBoxing, isGuestUnboxing);
         }
 
