@@ -2965,6 +2965,7 @@ public final class Meta extends ContextAccessImpl
         }
     }
 
+    @TruffleBoundary
     @GuestUnboxing
     public boolean unboxBoolean(@JavaType(Boolean.class) StaticObject boxed) {
         if (StaticObject.isNull(boxed) || boxed.getKlass() != java_lang_Boolean) {
@@ -2973,6 +2974,7 @@ public final class Meta extends ContextAccessImpl
         return (boolean) java_lang_Boolean_value.get(boxed);
     }
 
+    @TruffleBoundary
     @GuestUnboxing
     public byte unboxByte(@JavaType(Byte.class) StaticObject boxed) {
         if (StaticObject.isNull(boxed) || boxed.getKlass() != java_lang_Byte) {
@@ -2981,6 +2983,7 @@ public final class Meta extends ContextAccessImpl
         return (byte) java_lang_Byte_value.get(boxed);
     }
 
+    @TruffleBoundary
     @GuestUnboxing
     public char unboxCharacter(@JavaType(Character.class) StaticObject boxed) {
         if (StaticObject.isNull(boxed) || boxed.getKlass() != java_lang_Character) {
@@ -2989,6 +2992,7 @@ public final class Meta extends ContextAccessImpl
         return (char) java_lang_Character_value.get(boxed);
     }
 
+    @TruffleBoundary
     @GuestUnboxing
     public short unboxShort(@JavaType(Short.class) StaticObject boxed) {
         if (StaticObject.isNull(boxed) || boxed.getKlass() != java_lang_Short) {
@@ -2997,6 +3001,7 @@ public final class Meta extends ContextAccessImpl
         return (short) java_lang_Short_value.get(boxed);
     }
 
+    @TruffleBoundary
     @GuestUnboxing
     public float unboxFloat(@JavaType(Float.class) StaticObject boxed) {
         if (StaticObject.isNull(boxed) || boxed.getKlass() != java_lang_Float) {
@@ -3014,6 +3019,7 @@ public final class Meta extends ContextAccessImpl
         return (int) java_lang_Integer_value.get(boxed);
     }
 
+    @TruffleBoundary
     @GuestUnboxing
     public double unboxDouble(@JavaType(Double.class) StaticObject boxed) {
         if (StaticObject.isNull(boxed) || boxed.getKlass() != java_lang_Double) {
@@ -3022,6 +3028,7 @@ public final class Meta extends ContextAccessImpl
         return (double) java_lang_Double_value.get(boxed);
     }
 
+    @TruffleBoundary
     @GuestUnboxing
     public long unboxLong(@JavaType(Long.class) StaticObject boxed) {
         if (StaticObject.isNull(boxed) || boxed.getKlass() != java_lang_Long) {
@@ -3034,26 +3041,31 @@ public final class Meta extends ContextAccessImpl
 
     // region Guest boxing
 
+    @TruffleBoundary
     @GuestBoxing
     public @JavaType(Boolean.class) StaticObject boxBoolean(boolean value) {
         return (StaticObject) java_lang_Boolean_valueOf.invokeDirectStatic(value);
     }
 
+    @TruffleBoundary
     @GuestBoxing
     public @JavaType(Byte.class) StaticObject boxByte(byte value) {
         return (StaticObject) java_lang_Byte_valueOf.invokeDirectStatic(value);
     }
 
+    @TruffleBoundary
     @GuestBoxing
     public @JavaType(Character.class) StaticObject boxCharacter(char value) {
         return (StaticObject) java_lang_Character_valueOf.invokeDirectStatic(value);
     }
 
+    @TruffleBoundary
     @GuestBoxing
     public @JavaType(Short.class) StaticObject boxShort(short value) {
         return (StaticObject) java_lang_Short_valueOf.invokeDirectStatic(value);
     }
 
+    @TruffleBoundary
     @GuestBoxing
     public @JavaType(Float.class) StaticObject boxFloat(float value) {
         return (StaticObject) java_lang_Float_valueOf.invokeDirectStatic(value);
@@ -3065,11 +3077,13 @@ public final class Meta extends ContextAccessImpl
         return (StaticObject) java_lang_Integer_valueOf.invokeDirectStatic(value);
     }
 
+    @TruffleBoundary
     @GuestBoxing
     public @JavaType(Double.class) StaticObject boxDouble(double value) {
         return (StaticObject) java_lang_Double_valueOf.invokeDirectStatic(value);
     }
 
+    @TruffleBoundary
     @GuestBoxing
     public @JavaType(Long.class) StaticObject boxLong(long value) {
         return (StaticObject) java_lang_Long_valueOf.invokeDirectStatic(value);

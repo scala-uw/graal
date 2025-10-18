@@ -23,6 +23,10 @@
 package com.oracle.truffle.espresso.nodes.quick.invoke;
 
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.CompilerDirectives.CompilationFinal;
+import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
+import com.oracle.truffle.api.nodes.GuestBoxing;
+import com.oracle.truffle.api.nodes.GuestUnboxing;
 import com.oracle.truffle.espresso.descriptors.EspressoSymbols.Names;
 import com.oracle.truffle.espresso.impl.Method;
 import com.oracle.truffle.espresso.nodes.EspressoRootNode;
@@ -34,6 +38,8 @@ public final class InvokeStaticQuickNode extends InvokeQuickNode {
 
     @Child InvokeStatic invokeStatic;
     final boolean isDoPrivilegedCall;
+    @CompilationFinal final boolean isGuestBoxing;
+    @CompilationFinal final boolean isGuestUnboxing;
 
     public InvokeStaticQuickNode(Method method, int top, int curBCI) {
         super(method, top, curBCI);
@@ -41,6 +47,27 @@ public final class InvokeStaticQuickNode extends InvokeQuickNode {
         this.isDoPrivilegedCall = method.getMeta().java_security_AccessController.equals(method.getDeclaringKlass()) &&
                         Names.doPrivileged.equals(method.getName());
         this.invokeStatic = insert(InvokeStaticNodeGen.create(method));
+        String className = method.getDeclaringKlass().getNameAsString(), methodName = method.getNameAsString();
+        this.isGuestBoxing = className.equals("scala/runtime/BoxesRunTime") && (
+                methodName.equals("boxToBoolean") ||
+                methodName.equals("boxToCharacter") ||
+                methodName.equals("boxToByte") ||
+                methodName.equals("boxToShort") ||
+                methodName.equals("boxToInteger") ||
+                methodName.equals("boxToLong") ||
+                methodName.equals("boxToFloat") ||
+                methodName.equals("boxToDouble")
+            );
+        this.isGuestUnboxing = className.equals("scala/runtime/BoxesRunTime") && (
+                methodName.equals("unboxToBoolean") ||
+                methodName.equals("unboxToChar") ||
+                methodName.equals("unboxToByte") ||
+                methodName.equals("unboxToShort") ||
+                methodName.equals("unboxToInt") ||
+                methodName.equals("unboxToLong") ||
+                methodName.equals("unboxToFloat") ||
+                methodName.equals("unboxToDouble")
+            );
     }
 
     @Override
@@ -55,7 +82,23 @@ public final class InvokeStaticQuickNode extends InvokeQuickNode {
         }
         
         Object[] args = getArguments(frame);
-        return pushResult(frame, invokeStatic.execute(args));
+        if (isGuestBoxing) {
+            return pushResult(frame, guestBox(args));
+        } else if (isGuestUnboxing) {
+            return pushResult(frame, guestUnbox(args));
+        } else return pushResult(frame, invokeStatic.execute(args));
+    }
+
+    @TruffleBoundary
+    @GuestBoxing
+    private Object guestBox(Object[] args) {
+        return invokeStatic.execute(args);
+    }
+
+    @TruffleBoundary
+    @GuestUnboxing
+    private Object guestUnbox(Object[] args) {
+        return invokeStatic.execute(args);
     }
 
     public void initializeResolvedKlass() {

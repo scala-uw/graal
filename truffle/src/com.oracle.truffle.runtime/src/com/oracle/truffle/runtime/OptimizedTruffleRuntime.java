@@ -565,16 +565,10 @@ public abstract class OptimizedTruffleRuntime implements TruffleRuntime, Truffle
     }
 
     private static boolean isGuestBoxing(ResolvedJavaMethod method) {
-        if (getAnnotation(GuestBoxing.class, method) != null) {
-            System.out.println("GuestBoxing found");
-        }
         return getAnnotation(GuestBoxing.class, method) != null;
     }
 
     private static boolean isGuestUnboxing(ResolvedJavaMethod method) {
-        if (getAnnotation(GuestUnboxing.class, method) != null) {
-            System.out.println("GuestUnboxing found");
-        }
         return getAnnotation(GuestUnboxing.class, method) != null;
     }
 
