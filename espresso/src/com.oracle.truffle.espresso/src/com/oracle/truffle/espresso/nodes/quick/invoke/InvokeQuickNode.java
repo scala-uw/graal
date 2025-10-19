@@ -117,15 +117,17 @@ public abstract class InvokeQuickNode extends QuickNode {
     }
 
     public final int pushResult(VirtualFrame frame, StaticObject result) {
-        getBytecodeNode().checkNoForeignObjectAssumption(result);
+        // TODO
+        // getBytecodeNode().checkNoForeignObjectAssumption(result);
         EspressoFrame.putObject(frame, resultAt, result);
         return stackEffect;
     }
 
     public final int pushResult(VirtualFrame frame, Object result) {
-        if (!returnsPrimitive) {
-            getBytecodeNode().checkNoForeignObjectAssumption((StaticObject) result);
-        }
+        // TODO
+        //if (!returnsPrimitive) {
+        //    getBytecodeNode().checkNoForeignObjectAssumption((StaticObject) result);
+        //}
         EspressoFrame.putKind(frame, resultAt, result, method.getMethod().getReturnKind());
         return stackEffect;
         // if (!reifiedEnabled || returnTypeHint.isNoHint() || returnTypeHint.getKind() == TypeHints.TypeB.REFERENCE){

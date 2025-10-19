@@ -99,23 +99,23 @@ public final class InvokeStaticQuickNode extends InvokeQuickNode {
         if (isGuestBoxing) {
             switch (this.boxKind) {
                 case 'Z':
-                    return pushResult(frame, guestBoxBoolean(EspressoFrame.popInt(frame, this.top - 1) != 0));
+                    return pushResultNoForeign(frame, guestBoxBoolean(EspressoFrame.popInt(frame, this.top - 1) != 0));
                 case 'B':
-                    return pushResult(frame, guestBoxByte((byte) EspressoFrame.popInt(frame, this.top - 1)));
+                    return pushResultNoForeign(frame, guestBoxByte((byte) EspressoFrame.popInt(frame, this.top - 1)));
                 case 'S':
-                    return pushResult(frame, guestBoxShort((short) EspressoFrame.popInt(frame, this.top - 1)));
+                    return pushResultNoForeign(frame, guestBoxShort((short) EspressoFrame.popInt(frame, this.top - 1)));
                 case 'C':
-                    return pushResult(frame, guestBoxChar((char) EspressoFrame.popInt(frame, this.top - 1)));
+                    return pushResultNoForeign(frame, guestBoxChar((char) EspressoFrame.popInt(frame, this.top - 1)));
                 case 'I':
-                    return pushResult(frame, guestBoxInt(EspressoFrame.popInt(frame, this.top - 1)));
+                    return pushResultNoForeign(frame, guestBoxInt(EspressoFrame.popInt(frame, this.top - 1)));
                 case 'F':
-                    return pushResult(frame, guestBoxFloat(EspressoFrame.popFloat(frame, this.top - 1)));
+                    return pushResultNoForeign(frame, guestBoxFloat(EspressoFrame.popFloat(frame, this.top - 1)));
                 case 'J':
-                    return pushResult(frame, guestBoxLong(EspressoFrame.popLong(frame, this.top - 1)));
+                    return pushResultNoForeign(frame, guestBoxLong(EspressoFrame.popLong(frame, this.top - 1)));
                 case 'D':
-                    return pushResult(frame, guestBoxDouble(EspressoFrame.popDouble(frame, this.top - 1)));
+                    return pushResultNoForeign(frame, guestBoxDouble(EspressoFrame.popDouble(frame, this.top - 1)));
                 default:
-                    throw new AssertionError();
+                    throw new AssertionError("Unrecognized boxKind " + this.boxKind);
             }
         } else if (isGuestUnboxing) {
             switch (this.boxKind) {
@@ -136,12 +136,17 @@ public final class InvokeStaticQuickNode extends InvokeQuickNode {
                 case 'D':
                     return pushResult(frame, guestUnboxDouble(EspressoFrame.popObject(frame, this.top - 1)));
                 default:
-                    throw new AssertionError();
+                    throw new AssertionError("Unrecognized boxKind " + this.boxKind);
             }
         } else {
             Object[] args = getArguments(frame);
             return pushResult(frame, invokeStatic.execute(args));
         }
+    }
+
+    public final int pushResultNoForeign(VirtualFrame frame, StaticObject result) {
+        EspressoFrame.putObject(frame, resultAt, result);
+        return stackEffect;
     }
 
     @TruffleBoundary
