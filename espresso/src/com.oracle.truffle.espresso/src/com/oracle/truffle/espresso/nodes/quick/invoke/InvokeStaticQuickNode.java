@@ -27,11 +27,15 @@ import com.oracle.truffle.api.CompilerDirectives.CompilationFinal;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.nodes.GuestBoxing;
 import com.oracle.truffle.api.nodes.GuestUnboxing;
+import com.oracle.truffle.espresso.classfile.JavaKind;
+import com.oracle.truffle.espresso.classfile.descriptors.SignatureSymbols;
 import com.oracle.truffle.espresso.descriptors.EspressoSymbols.Names;
 import com.oracle.truffle.espresso.impl.Method;
+import com.oracle.truffle.espresso.nodes.EspressoFrame;
 import com.oracle.truffle.espresso.nodes.EspressoRootNode;
 import com.oracle.truffle.espresso.nodes.bytecodes.InvokeStatic;
 import com.oracle.truffle.espresso.nodes.bytecodes.InvokeStaticNodeGen;
+import com.oracle.truffle.espresso.runtime.staticobject.StaticObject;
 import com.oracle.truffle.espresso.vm.VM;
 
 public final class InvokeStaticQuickNode extends InvokeQuickNode {
@@ -40,6 +44,7 @@ public final class InvokeStaticQuickNode extends InvokeQuickNode {
     final boolean isDoPrivilegedCall;
     @CompilationFinal final boolean isGuestBoxing;
     @CompilationFinal final boolean isGuestUnboxing;
+    @CompilationFinal final char boxKind;
 
     public InvokeStaticQuickNode(Method method, int top, int curBCI) {
         super(method, top, curBCI);
@@ -68,6 +73,16 @@ public final class InvokeStaticQuickNode extends InvokeQuickNode {
                 methodName.equals("unboxToFloat") ||
                 methodName.equals("unboxToDouble")
             );
+        if (this.isGuestBoxing) {
+            this.boxKind = (char) SignatureSymbols.parameterType(method.getParsedSignature(), 0).byteAt(0);
+        } else if (this.isGuestUnboxing) {
+            this.boxKind = method.getReturnKind().getTypeChar();
+        } else this.boxKind = 0;
+        if (this.isGuestBoxing || this.isGuestUnboxing) {
+            assert method.getParameterCount() == 1 && this.typeArgCnt == 0;
+            assert this.boxKind == JavaKind.Boolean.getTypeChar() || this.boxKind == JavaKind.Char.getTypeChar() || this.boxKind == JavaKind.Byte.getTypeChar()  || this.boxKind == JavaKind.Short.getTypeChar()
+                || this.boxKind == JavaKind.Int.getTypeChar()     || this.boxKind == JavaKind.Long.getTypeChar() || this.boxKind == JavaKind.Float.getTypeChar() || this.boxKind == JavaKind.Double.getTypeChar();
+        }
     }
 
     @Override
@@ -81,24 +96,148 @@ public final class InvokeStaticQuickNode extends InvokeQuickNode {
             }
         }
         
-        Object[] args = getArguments(frame);
         if (isGuestBoxing) {
-            return pushResult(frame, guestBox(args));
+            switch (this.boxKind) {
+                case 'Z':
+                    return pushResult(frame, guestBoxBoolean(EspressoFrame.popInt(frame, this.top - 1) != 0));
+                case 'B':
+                    return pushResult(frame, guestBoxByte((byte) EspressoFrame.popInt(frame, this.top - 1)));
+                case 'S':
+                    return pushResult(frame, guestBoxShort((short) EspressoFrame.popInt(frame, this.top - 1)));
+                case 'C':
+                    return pushResult(frame, guestBoxChar((char) EspressoFrame.popInt(frame, this.top - 1)));
+                case 'I':
+                    return pushResult(frame, guestBoxInt(EspressoFrame.popInt(frame, this.top - 1)));
+                case 'F':
+                    return pushResult(frame, guestBoxFloat(EspressoFrame.popFloat(frame, this.top - 1)));
+                case 'J':
+                    return pushResult(frame, guestBoxLong(EspressoFrame.popLong(frame, this.top - 1)));
+                case 'D':
+                    return pushResult(frame, guestBoxDouble(EspressoFrame.popDouble(frame, this.top - 1)));
+                default:
+                    throw new AssertionError();
+            }
         } else if (isGuestUnboxing) {
-            return pushResult(frame, guestUnbox(args));
-        } else return pushResult(frame, invokeStatic.execute(args));
+            switch (this.boxKind) {
+                case 'Z':
+                    return pushResult(frame, guestUnboxBoolean(EspressoFrame.popObject(frame, this.top - 1)) ? 1 : 0);
+                case 'B':
+                    return pushResult(frame, guestUnboxByte(EspressoFrame.popObject(frame, this.top - 1)));
+                case 'S':
+                    return pushResult(frame, guestUnboxShort(EspressoFrame.popObject(frame, this.top - 1)));
+                case 'C':
+                    return pushResult(frame, guestUnboxChar(EspressoFrame.popObject(frame, this.top - 1)));
+                case 'I':
+                    return pushResult(frame, guestUnboxInt(EspressoFrame.popObject(frame, this.top - 1)));
+                case 'F':
+                    return pushResult(frame, guestUnboxFloat(EspressoFrame.popObject(frame, this.top - 1)));
+                case 'J':
+                    return pushResult(frame, guestUnboxLong(EspressoFrame.popObject(frame, this.top - 1)));
+                case 'D':
+                    return pushResult(frame, guestUnboxDouble(EspressoFrame.popObject(frame, this.top - 1)));
+                default:
+                    throw new AssertionError();
+            }
+        } else {
+            Object[] args = getArguments(frame);
+            return pushResult(frame, invokeStatic.execute(args));
+        }
     }
 
     @TruffleBoundary
     @GuestBoxing
-    private Object guestBox(Object[] args) {
-        return invokeStatic.execute(args);
+    private StaticObject guestBoxBoolean(boolean arg) {
+        return (StaticObject) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestBoxing
+    private StaticObject guestBoxByte(byte arg) {
+        return (StaticObject) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestBoxing
+    private StaticObject guestBoxShort(short arg) {
+        return (StaticObject) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestBoxing
+    private StaticObject guestBoxChar(char arg) {
+        return (StaticObject) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestBoxing
+    private StaticObject guestBoxInt(int arg) {
+        return (StaticObject) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestBoxing
+    private StaticObject guestBoxFloat(float arg) {
+        return (StaticObject) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestBoxing
+    private StaticObject guestBoxLong(long arg) {
+        return (StaticObject) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestBoxing
+    private StaticObject guestBoxDouble(double arg) {
+        return (StaticObject) invokeStatic.execute(new Object[]{arg});
     }
 
     @TruffleBoundary
     @GuestUnboxing
-    private Object guestUnbox(Object[] args) {
-        return invokeStatic.execute(args);
+    private boolean guestUnboxBoolean(StaticObject arg) {
+        return (boolean) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestUnboxing
+    private byte guestUnboxByte(StaticObject arg) {
+        return (byte) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestUnboxing
+    private short guestUnboxShort(StaticObject arg) {
+        return (short) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestUnboxing
+    private char guestUnboxChar(StaticObject arg) {
+        return (char) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestUnboxing
+    private int guestUnboxInt(StaticObject arg) {
+        return (int) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestUnboxing
+    private float guestUnboxFloat(StaticObject arg) {
+        return (float) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestUnboxing
+    private long guestUnboxLong(StaticObject arg) {
+        return (long) invokeStatic.execute(new Object[]{arg});
+    }
+
+    @TruffleBoundary
+    @GuestUnboxing
+    private double guestUnboxDouble(StaticObject arg) {
+        return (double) invokeStatic.execute(new Object[]{arg});
     }
 
     public void initializeResolvedKlass() {
