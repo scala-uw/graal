@@ -128,7 +128,7 @@ public class TypeHints {
         @CompilerDirectives.CompilationFinal
         private final int index;
 
-        public TypeB(byte kind, int index, int outerClassIndex) {
+        public TypeB(byte kind, int outerClassIndex, int index) {
             assert kind == CLASS_TYPE_PARAM || kind == METHOD_TYPE_PARAM || 
                    kind == ARR_CLASS_TYPE_PARAM || kind == ARR_METHOD_TYPE_PARAM;
             this.kind = kind;

@@ -1012,7 +1012,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                                 statementIndex == instrumentation.hookBCIToNodeIndex.lookupBucket(curBCI);
                 
                 if (DEBUG && hasAttributes) {
-                    System.out.println("BCI: " + curBCI + " " + Bytecodes.nameOf(curOpcode) + " top: " + top);
+                    System.out.println("--in method:" + methodVersion.getMethod().getNameAsString() +
+                        " -- BCI: " + curBCI + " " + Bytecodes.nameOf(curOpcode) + " top: " + top);
                 }
 
                 if (instrument != null || Bytecodes.canTrap(curOpcode)) {
