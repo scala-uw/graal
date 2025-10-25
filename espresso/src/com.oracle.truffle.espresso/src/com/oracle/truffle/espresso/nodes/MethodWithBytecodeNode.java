@@ -39,6 +39,7 @@ import com.oracle.truffle.api.interop.NodeLibrary;
 import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
+import com.oracle.truffle.api.nodes.ExplodeLoop.LoopExplosionKind;
 import com.oracle.truffle.espresso.analysis.typehints.TypeAnalysisResult;
 import com.oracle.truffle.espresso.analysis.typehints.TypeHintAnalysis;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodTypeParameterCountAttribute;
@@ -58,24 +59,23 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
 
     @Child AbstractInstrumentableBytecodeNode bytecodeNode;
     @Children BytecodeNode[] specializations;
-    @CompilerDirectives.CompilationFinal(dimensions=1)
-    private byte[][] cacheKeys = null;
+    @CompilerDirectives.CompilationFinal(dimensions=2) private byte[][] cacheKeys = null;
     private final FrameDescriptor frameDescriptor;
     
     @CompilerDirectives.CompilationFinal
     private int typeParamCount = 0;
-    @CompilerDirectives.CompilationFinal(dimensions=1)
     private TypeAnalysisResult[] analysis = null;
     private final Method.MethodVersion methodVersion;
+    private final boolean trivialBytecode;
     
     @CompilerDirectives.CompilationFinal
     public static final boolean SHOW_TYPEANALYSIS = false;
-    public static final boolean DEBUG = false;
 
     MethodWithBytecodeNode(BytecodeNode bytecodeNode) {
         super(bytecodeNode.getMethodVersion());
         this.bytecodeNode = bytecodeNode;
         this.methodVersion = bytecodeNode.getMethodVersion();
+        this.trivialBytecode = BytecodeNode.isTrivialBytecodes(methodVersion);
         this.frameDescriptor = bytecodeNode.getFrameDescriptor();
         this.specializations = null;
     }
@@ -83,14 +83,13 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
     MethodWithBytecodeNode(Method.MethodVersion methodVersion) {
         super(methodVersion);
         this.methodVersion = methodVersion;
+        this.trivialBytecode = BytecodeNode.isTrivialBytecodes(methodVersion);
 
         CompilerAsserts.neverPartOfCompilation();
         MethodTypeParameterCountAttribute attr = methodVersion.getMethod().getMethodTypeParameterCountAttribute();
         this.typeParamCount = attr != null ? attr.getCount() : 0;
 
         if (this.typeParamCount != 0) {
-            if (DEBUG) System.out.println("Method " + methodVersion.getMethod().getNameAsString() +
-                " has " + typeParamCount + " reified type parameters.");
             this.analysis = TypeHintAnalysis.analyze(methodVersion, SHOW_TYPEANALYSIS).getRes();
             this.bytecodeNode = null;
             byte[] bt = new byte[typeParamCount];
@@ -119,49 +118,37 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
 
     @Override
     Object execute(VirtualFrame frame) {
-        BytecodeNode node = findSpecialization(frame.getArguments());
-        node.initializeFrame(frame);
-        Object result = node.execute(frame);
-        return result;
+        return executeSpecialization(frame.getArguments(), frame);
     }
 
-    @ExplodeLoop
-    private BytecodeNode findSpecialization(Object[] args){
-        // if (methodVersion.getMethod().getNameAsString().contains("identity")){
-        //     System.out.println("Args length: " + args.length + "typeParamCount: " + typeParamCount +
-        //         "bytecodeNode : " + bytecodeNode +
-        //         " for method: " + methodVersion.getMethod().getName());
-
-        // }
-        if (typeParamCount == 0) {
-            return (BytecodeNode) bytecodeNode;
+    @ExplodeLoop(kind = ExplodeLoop.LoopExplosionKind.FULL_UNROLL_UNTIL_RETURN)
+    private Object executeSpecialization(Object[] args, VirtualFrame frame){
+        if (this.bytecodeNode != null) {
+            this.bytecodeNode.initializeFrame(frame);
+            return this.bytecodeNode.execute(frame);
         }
         byte[] key = collectReifiedValues(args);
-        if (DEBUG) {
-            System.out.println("for method " + methodVersion.getMethod().getNameAsString() +
-                " with args: " + Arrays.toString(args) + " with keys: " + Arrays.toString(key));
-        }
         
-        for (int i = 0; i < specializations.length; i++){
+        for (int i = 0; i < cacheKeys.length; i++){
             if (Arrays.equals(cacheKeys[i], key)){
-                return specializations[i];
+                specializations[i].initializeFrame(frame);
+                return specializations[i].execute(frame);
             }
         }
 
         CompilerDirectives.transferToInterpreterAndInvalidate();
 
-        return insertSpecialization(key);
+        BytecodeNode newNode = insertSpecialization(key);
+        newNode.initializeFrame(frame);
+        return newNode.execute(frame);
     }
 
     private byte[] collectReifiedValues(Object[] args){
         byte[] key = new byte[typeParamCount];
-        // get method type parameters reified values
         for (int i = 0; i < typeParamCount; i++){
             key[i] = (byte) args[args.length - typeParamCount + i];
         }
-        if (DEBUG) System.out.println("keys: for method" + methodVersion.getMethod().getNameAsString() + Arrays.toString(key));
-        //also get class type parameters reified values from fields
-        //TODO
+        //TODO: class type parameters
         return key;
     }
 
@@ -173,12 +160,11 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
 
         int len = specializations.length;
         BytecodeNode[] newSpecializations = Arrays.copyOf(specializations, len + 1);
-        
         newSpecializations[len] = node;
         this.specializations = newSpecializations;
-
         cacheKeys = Arrays.copyOf(cacheKeys, len + 1);
         cacheKeys[len] = key;
+        notifyInserted(node);
 
         return node;        
     }
@@ -217,7 +203,7 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
         if (bytecodeNode != null) {
             return !(bytecodeNode instanceof WrapperNode) && bytecodeNode.isTrivial();
         } else {
-            return specializations[8].isTrivial();
+            return this.trivialBytecode;
         }
     }
 

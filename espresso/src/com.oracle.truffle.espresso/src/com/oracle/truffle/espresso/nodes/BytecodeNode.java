@@ -3605,6 +3605,44 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         return true;
     }
 
+    public static boolean isTrivialBytecodes(MethodVersion methodVersion) {
+        if (methodVersion.getMethod().isSynchronized()) {
+            return false;
+        }
+        byte[] originalCode = methodVersion.getOriginalCode();
+        /*
+         * originalCode.length < TrivialMethodSize is checked in the constructor because this method
+         * is called from a compiler thread where the context is not accessible.
+         */
+        BytecodeStream stream = new BytecodeStream(originalCode);
+        for (int bci = 0; bci < stream.endBCI(); bci = stream.nextBCI(bci)) {
+            int bc = stream.currentBC(bci);
+            // Trivial methods should be leaves.
+            if (Bytecodes.isInvoke(bc)) {
+                return false;
+            }
+            if (Bytecodes.LOOKUPSWITCH == bc || Bytecodes.TABLESWITCH == bc) {
+                return false;
+            }
+            if (Bytecodes.MONITORENTER == bc || Bytecodes.MONITOREXIT == bc) {
+                return false;
+            }
+            if (Bytecodes.ANEWARRAY == bc || MULTIANEWARRAY == bc) {
+                // The allocated array is Arrays.fill-ed with StaticObject.NULL but loops are not
+                // allowed in trivial methods.
+                return false;
+            }
+            if (Bytecodes.isBranch(bc)) {
+                int dest = stream.readBranchDest(bci);
+                if (dest <= bci) {
+                    // Back-edge (probably a loop) but loops are not allowed in trivial methods.
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     @Override
     protected boolean isTrivial() {
         CompilerAsserts.neverPartOfCompilation();
