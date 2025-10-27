@@ -173,7 +173,7 @@ public class Field extends Member<Type> implements FieldRef, FieldAccess<Klass, 
 
     @Override
     public final String toString() {
-        return getDeclaringKlass().getNameAsString() + "." + getName() + ": " + getType();
+        return getDeclaringKlass().getNameAsString() + "." + getName() + ": " + getType() + "::" + linkedField.reifiedType;
     }
 
     public final Klass resolveTypeKlass() {

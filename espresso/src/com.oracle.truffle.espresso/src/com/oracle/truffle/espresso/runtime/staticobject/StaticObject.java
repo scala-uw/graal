@@ -298,7 +298,22 @@ public class StaticObject implements TruffleObject, Cloneable {
         for (Field f : ((ObjectKlass) getKlass()).getFieldTable()) {
             // Also prints hidden fields
             if (!f.isRemoved()) {
-                str.append("\n    ").append(f.getName()).append(": ").append(f.get(this).toString());
+                if (!f.isHidden()) str.append("\n    ").append(f.getName()).append(": ").append(f.get(this).toString());
+                else {
+                    Object hidden = f.getHiddenObject(this);
+                    if (hidden.getClass().isArray()){
+                        str.append("\n    ").append(f.getName()).append(": [");
+                        int len = Array.getLength(hidden);
+                        for (int i = 0; i < len; i++) {
+                            if (i > 0) str.append(", ");
+                            Object elem = Array.get(hidden, i);
+                            str.append(elem);
+                        }
+                        str.append("]");
+                    } else {
+                        str.append("\n    ").append(f.getName()).append(": ").append(f.getHiddenObject(this).toString());
+                    }
+                }
             }
         }
         return str.toString();

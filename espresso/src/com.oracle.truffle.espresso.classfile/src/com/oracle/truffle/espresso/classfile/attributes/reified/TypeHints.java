@@ -141,14 +141,17 @@ public class TypeHints {
         public int getIndex() { return index; }
         public boolean isGenericArray() { return kind == ARR_CLASS_TYPE_PARAM || kind == ARR_METHOD_TYPE_PARAM; }
         
-        public byte resolve(byte[] methodTypeParams) {
+        public byte resolve(byte[] methodTypeParams, byte[][] classTypeParams) {
             if (this.kind == METHOD_TYPE_PARAM) {
                 return methodTypeParams[this.index];
             } else if (this.kind == CLASS_TYPE_PARAM) {
-                return TypeA.REFERENCE; // TODO: class type params
+                return classTypeParams[this.outerClassIndex][this.index];
             } else {
                 return TypeA.REFERENCE;
             }
+        }
+        public byte resolve(byte[] methodTypeParams) {
+            return resolve(methodTypeParams, null);
         }
         
         public byte resolveArrayElement(byte[] methodTypeParams) {

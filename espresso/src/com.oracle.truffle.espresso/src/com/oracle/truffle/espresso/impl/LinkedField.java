@@ -29,11 +29,13 @@ import com.oracle.truffle.api.staticobject.StaticProperty;
 import com.oracle.truffle.espresso.classfile.JavaKind;
 import com.oracle.truffle.espresso.classfile.ParserField;
 import com.oracle.truffle.espresso.classfile.attributes.Attribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.classfile.descriptors.ByteSequence;
 import com.oracle.truffle.espresso.classfile.descriptors.Name;
 import com.oracle.truffle.espresso.classfile.descriptors.Symbol;
 import com.oracle.truffle.espresso.classfile.descriptors.Type;
 import com.oracle.truffle.espresso.classfile.descriptors.TypeSymbols;
+import com.oracle.truffle.espresso.descriptors.EspressoSymbols.Types;
 import com.oracle.truffle.espresso.meta.EspressoError;
 import com.oracle.truffle.espresso.runtime.staticobject.StaticObject;
 
@@ -47,10 +49,31 @@ final class LinkedField extends StaticProperty {
 
     private final ParserField parserField;
     private final int slot;
+    public final byte reifiedType;
 
     LinkedField(ParserField parserField, int slot, IdMode mode) {
         this.parserField = maybeCorrectParserField(parserField, mode);
         this.slot = slot;
+        this.reifiedType = -1; // no reified type
+    }
+
+    LinkedField(ParserField parserField, int slot, IdMode mode, byte reifiedType) {
+        this.parserField = maybeCorrectParserField(parserField, mode);
+        this.slot = slot;
+        switch (reifiedType){
+            case TypeHints.TypeA.BYTE:
+            case TypeHints.TypeA.CHAR:
+            case TypeHints.TypeA.DOUBLE:
+            case TypeHints.TypeA.FLOAT:
+            case TypeHints.TypeA.INT:
+            case TypeHints.TypeA.LONG:
+            case TypeHints.TypeA.SHORT:
+            case TypeHints.TypeA.BOOLEAN:
+                this.reifiedType = reifiedType;
+                break;
+            default:
+                this.reifiedType = -1; // no reified type
+        }
     }
 
     private static ParserField maybeCorrectParserField(ParserField parserField, IdMode mode) {
@@ -135,7 +158,21 @@ final class LinkedField extends StaticProperty {
     }
 
     public Symbol<Type> getType() {
-        return getParserField().getType();
+        if (reifiedType == -1) return getParserField().getType();
+        else {
+            switch (reifiedType) {
+                case TypeHints.TypeA.BYTE:  return Types._byte;
+                case TypeHints.TypeA.CHAR:  return Types._char;
+                case TypeHints.TypeA.DOUBLE:return Types._double;
+                case TypeHints.TypeA.FLOAT: return Types._float;
+                case TypeHints.TypeA.INT:   return Types._int;
+                case TypeHints.TypeA.LONG:  return Types._long;
+                case TypeHints.TypeA.SHORT: return Types._short;
+                case TypeHints.TypeA.BOOLEAN:return Types._boolean;
+                default:
+                    throw EspressoError.shouldNotReachHere();
+            }
+        }
     }
 
     public int getFlags() {

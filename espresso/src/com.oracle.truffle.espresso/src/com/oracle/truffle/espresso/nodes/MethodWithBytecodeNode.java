@@ -39,7 +39,6 @@ import com.oracle.truffle.api.interop.NodeLibrary;
 import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
-import com.oracle.truffle.api.nodes.ExplodeLoop.LoopExplosionKind;
 import com.oracle.truffle.espresso.analysis.typehints.TypeAnalysisResult;
 import com.oracle.truffle.espresso.analysis.typehints.TypeHintAnalysis;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodTypeParameterCountAttribute;
@@ -168,33 +167,6 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
 
         return node;        
     }
-
-    // private static final class ByteKey{
-    //     private final byte[] key;
-    //     private final int hash;
-
-    //     ByteKey(byte[] key){
-    //         this.key = key;
-    //         this.hash = Arrays.hashCode(key);
-    //     }
-
-    //     @Override
-    //     public boolean equals(Object obj) {
-    //         if (this == obj) {
-    //             return true;
-    //         }
-    //         if (obj instanceof ByteKey){
-    //             ByteKey other = (ByteKey) obj;
-    //             return Arrays.equals(this.key, other.key);
-    //         }
-    //         return false;
-    //     }
-
-    //     @Override
-    //     public int hashCode() {
-    //         return hash;
-    //     }
-    // }
 
     @Override
     @SuppressFBWarnings(value = "BC_IMPOSSIBLE_INSTANCEOF", justification = "bytecodeNode may be replaced by instrumentation with a wrapper node")

@@ -300,6 +300,8 @@ import com.oracle.truffle.espresso.constantpool.Resolution;
 import com.oracle.truffle.espresso.constantpool.ResolvedDynamicConstant;
 import com.oracle.truffle.espresso.constantpool.ResolvedWithInvokerClassMethodRefConstant;
 import com.oracle.truffle.espresso.constantpool.RuntimeConstantPool;
+import com.oracle.truffle.espresso.descriptors.EspressoSymbols.Names;
+import com.oracle.truffle.espresso.descriptors.EspressoSymbols.Types;
 import com.oracle.truffle.espresso.impl.ArrayKlass;
 import com.oracle.truffle.espresso.impl.Field;
 import com.oracle.truffle.espresso.impl.Klass;
@@ -1649,7 +1651,20 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                         break;
                     case NEW         :
                         Klass klass = resolveType(NEW, bs.readCPI2(curBCI));
-                        putObject(frame, top, newReferenceObject(klass)); break;
+                        StaticObject obj;
+                        if (instructionTypeArgs[curBCI] != null && instructionTypeArgs[curBCI].length > 0){
+                            byte[][] classTypeParams = new byte[][] {instructionTypeArgs[curBCI]};
+                            if (DEBUG) System.out.println("ABout to create reified object for class " + klass.getName() + " with type args: " + Arrays.toString(methodParamTypes)
+                                    + " / " + Arrays.deepToString(classTypeParams)
+                                    + " in method " + getMethod().getNameAsString() + " at bci " + curBCI);
+                            obj = newReifiedObject(klass, methodTypeParams, classTypeParams);
+                            setHiddenByteArray((ObjectKlass) klass, obj, instructionTypeArgs[curBCI]);
+                            if (DEBUG) System.out.println("Created reified object for class " + klass.getName() + " with type args " + Arrays.toString(instructionTypeArgs[curBCI])
+                                    + " in method " + getMethod().getNameAsString() + " at bci " + curBCI + " obj: " + obj.toVerboseString());
+                        } else {
+                            obj = newReferenceObject(klass);
+                        }
+                        putObject(frame, top, obj); break;
                     case NEWARRAY    :
                         byte jvmPrimitiveType = bs.readByte(curBCI);
                         int length = popInt(frame, top - 1);
@@ -2056,10 +2071,27 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         return getAllocator().createNew((ObjectKlass) klass);
     }
 
-    private StaticObject newReifiedObject(Klass klass, byte[] reifiedTypeValues){
+    private StaticObject newReifiedObject(Klass klass, byte[] methodReifiedTypeValues, byte[][] classReifiedTypeValues){
         assert !klass.isPrimitive() : "Verifier guarantee";
         GuestAllocator.AllocationChecks.checkCanAllocateNewReference(getMethod().getMeta(), klass, true, this);
-        return getAllocator().createNewReified((ObjectKlass) klass, reifiedTypeValues);
+        return getAllocator().createNewReified((ObjectKlass) klass, methodReifiedTypeValues, classReifiedTypeValues);
+    }
+
+    private static void setHiddenByteArray(ObjectKlass klass, StaticObject obj, byte[] reifiedValues){
+        if (reifiedValues == null || reifiedValues.length == 0) {
+            return;
+        }
+        Field field = klass.requireHiddenField(Names.HIDDEN_REIFIED_BYTE_ARRAY);
+        Field[] ftable = klass.getFieldTable();
+        if (DEBUG) System.out.println("Field table for klass " + klass.getName().toString() + " : " + Arrays.toString(ftable));
+        if (field == null){
+            if (DEBUG) System.out.println("Cannot find hidden reified field in class: " + klass.getName().toString() + " in klass: " + obj.toVerboseString());
+            return;
+        } 
+        if (DEBUG) System.out.println("Setting hidden reified field"  + field.toString() +
+            " in class: " + klass.getName().toString() + " for obj: " + obj.toVerboseString() +
+            " with reified values: " + Arrays.toString(reifiedValues));
+        field.setHiddenObject(obj, reifiedValues);
     }
 
     private StaticObject newPrimitiveArray(byte jvmPrimitiveType, int length) {

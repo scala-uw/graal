@@ -65,7 +65,8 @@ public final class LinkedKlass {
     private final StaticShape<StaticObjectFactory> instanceShape;
     private final StaticShape<StaticObjectFactory> staticShape;
 
-    private Map<ByteArrayKey, LinkedKlassFieldLayout> reifiedShapes = new HashMap<>(); // ????
+    // specialized layouts
+    private final Map<ByteKey, LinkedKlassFieldLayout> reifiedLayouts = new HashMap<>();
 
     // instance fields declared in the corresponding LinkedKlass (includes hidden fields)
     @CompilationFinal(dimensions = 1) //
@@ -239,13 +240,17 @@ public final class LinkedKlass {
         return isStatic ? staticShape : instanceShape;
     }
 
-    public StaticShape<StaticObjectFactory> getReifiedShape(boolean isStatic, byte[] reifiedTypeValues) {
-        assert reifiedTypeValues != null : "reifiedTypeValues must not be null";
-        ByteArrayKey key = new ByteArrayKey(reifiedTypeValues);
-        LinkedKlassFieldLayout fieldLayout = reifiedShapes.get(key);
-        if (fieldLayout != null) return isStatic ? fieldLayout.staticShape : fieldLayout.instanceShape;
-        fieldLayout = new LinkedKlassFieldLayout(language, parserKlass, superKlass, reifiedTypeValues);
-        reifiedShapes.put(key, fieldLayout);
+    public StaticShape<StaticObjectFactory> getReifiedShape(boolean isStatic, byte[] methodReifiedTypeValues, byte[][] classReifiedTypeValues) {
+        if (classReifiedTypeValues.length == 0) {
+            return getShape(isStatic);
+        }
+
+        ByteKey key = new ByteKey(classReifiedTypeValues);
+        LinkedKlassFieldLayout fieldLayout = reifiedLayouts.get(key);
+        if (fieldLayout == null) {
+            fieldLayout = new LinkedKlassFieldLayout(language, parserKlass, superKlass, methodReifiedTypeValues, classReifiedTypeValues);
+            reifiedLayouts.put(key, fieldLayout);
+        }
         return isStatic ? fieldLayout.staticShape : fieldLayout.instanceShape;
     }
 
@@ -254,20 +259,20 @@ public final class LinkedKlass {
         return "LinkedKlass<" + getType() + ">";
     }
 
-    private final class ByteArrayKey {
-        private final byte[] data;
+    private final class ByteKey {
+        private final byte[][] data;
         private final int hash;
 
-        ByteArrayKey(byte[] data) {
+        ByteKey(byte[][] data) {
             this.data = data;
-            this.hash = Arrays.hashCode(data);
+            this.hash = Arrays.deepHashCode(data);
         }
 
         @Override
         public boolean equals(Object obj){
             if (this == obj) return true;
-            if (obj instanceof ByteArrayKey other){
-                return Arrays.equals(this.data, other.data);
+            if (obj instanceof ByteKey other){
+                return Arrays.deepEquals(this.data, other.data);
             } else {
                 return false;
             }

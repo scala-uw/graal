@@ -870,6 +870,8 @@ public class EspressoSymbols {
         // Field
         public static final Symbol<Name> HIDDEN_FIELD_KEY = SYMBOLS.putName("0HIDDEN_FIELD_KEY");
         public static final Symbol<Name> HIDDEN_FIELD_RUNTIME_VISIBLE_TYPE_ANNOTATIONS = SYMBOLS.putName("0HIDDEN_FIELD_RUNTIME_VISIBLE_TYPE_ANNOTATIONS");
+        // reified byte array
+        public static final Symbol<Name> HIDDEN_REIFIED_BYTE_ARRAY = SYMBOLS.putName("0HIDDEN_REIFIED_BYTE_ARRAY");
         // Throwable
         public static final Symbol<Name> HIDDEN_FRAMES = SYMBOLS.putName("0HIDDEN_FRAMES");
         public static final Symbol<Name> HIDDEN_EXCEPTION_WRAPPER = SYMBOLS.putName("0HIDDEN_EXCEPTION_WRAPPER");

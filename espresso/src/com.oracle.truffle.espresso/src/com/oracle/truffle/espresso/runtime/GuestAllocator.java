@@ -40,6 +40,7 @@ import com.oracle.truffle.api.instrumentation.AllocationReporter;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
+import com.oracle.truffle.api.object.Shape;
 import com.oracle.truffle.api.staticobject.StaticShape;
 import com.oracle.truffle.espresso.EspressoLanguage;
 import com.oracle.truffle.espresso.classfile.JavaKind;
@@ -119,11 +120,11 @@ public final class GuestAllocator implements LanguageAccess {
         return trackAllocation(klass, newObj);
     }
 
-    public StaticObject createNewReified(ObjectKlass klass, byte[] reifiedTypeValues) {
+    public StaticObject createNewReified(ObjectKlass klass, byte[] methodReifiedTypeValues, byte[][] classReifiedTypeValues) {
         assert AllocationChecks.canAllocateNewReference(klass);
         assert klass != klass.getMeta().java_lang_Class;
         klass.safeInitialize();
-        StaticShape<StaticObject.StaticObjectFactory> reifiedShape = klass.getLinkedKlass().getReifiedShape(false, reifiedTypeValues);
+        StaticShape<StaticObject.StaticObjectFactory> reifiedShape = klass.getLinkedKlass().getReifiedShape(false, methodReifiedTypeValues, classReifiedTypeValues);
         StaticObject newReifiedObj = reifiedShape.getFactory().create(klass);
         initInstanceFields(newReifiedObj, klass);
         return trackAllocation(klass, newReifiedObj);
