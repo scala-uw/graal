@@ -41,6 +41,7 @@ import com.oracle.truffle.api.library.ExportMessage;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.espresso.analysis.typehints.TypeAnalysisResult;
 import com.oracle.truffle.espresso.analysis.typehints.TypeHintAnalysis;
+import com.oracle.truffle.espresso.classfile.attributes.reified.ClassTypeParameterCountAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodTypeParameterCountAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.impl.Method;
@@ -62,7 +63,9 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
     private final FrameDescriptor frameDescriptor;
     
     @CompilerDirectives.CompilationFinal
-    private int typeParamCount = 0;
+    private int methodTypeParamCount = 0;
+    @CompilerDirectives.CompilationFinal
+    private int classTypeParamCount = 0;
     private TypeAnalysisResult[] analysis = null;
     private final Method.MethodVersion methodVersion;
     private final boolean trivialBytecode;
@@ -85,14 +88,16 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
         this.trivialBytecode = BytecodeNode.isTrivialBytecodes(methodVersion);
 
         CompilerAsserts.neverPartOfCompilation();
-        MethodTypeParameterCountAttribute attr = methodVersion.getMethod().getMethodTypeParameterCountAttribute();
-        this.typeParamCount = attr != null ? attr.getCount() : 0;
+        MethodTypeParameterCountAttribute methodTypeParamCntAttr = methodVersion.getMethod().getMethodTypeParameterCountAttribute();
+        ClassTypeParameterCountAttribute classTypeParamCntAttr = methodVersion.getKlassVersion().getClassTypeParameterCountAttribute();
+        this.methodTypeParamCount = methodTypeParamCntAttr != null ? methodTypeParamCntAttr.getCount() : 0;
+        this.classTypeParamCount = classTypeParamCntAttr != null ? classTypeParamCntAttr.getCount() : 0;
 
-        if (this.typeParamCount != 0) {
+        if (this.methodTypeParamCount != 0 || this.classTypeParamCount != 0) { //TODO: check activation condition for type analysis
             this.analysis = TypeHintAnalysis.analyze(methodVersion, SHOW_TYPEANALYSIS).getRes();
             this.bytecodeNode = null;
-            byte[] bt = new byte[typeParamCount];
-            for (int i =0; i < typeParamCount; i++){
+            byte[] bt = new byte[methodTypeParamCount];
+            for (int i =0; i < methodTypeParamCount; i++){
                 bt[i] = TypeHints.TypeA.REFERENCE;
             }
             this.frameDescriptor = new BytecodeNode(methodVersion, null, bt).getFrameDescriptor();
@@ -143,9 +148,9 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
     }
 
     private byte[] collectReifiedValues(Object[] args){
-        byte[] key = new byte[typeParamCount];
-        for (int i = 0; i < typeParamCount; i++){
-            key[i] = (byte) args[args.length - typeParamCount + i];
+        byte[] key = new byte[methodTypeParamCount];
+        for (int i = 0; i < methodTypeParamCount; i++){
+            key[i] = (byte) args[args.length - methodTypeParamCount + i];
         }
         //TODO: class type parameters
         return key;

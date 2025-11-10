@@ -1028,8 +1028,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
 
 
                 prepareArgsForInvoke(frame, curBCI, top);
-                pushInstTypeArgs(frame, curBCI, top);
-                if (instructionTypeArgs[curBCI] != null) {
+                if (curOpcode != Bytecodes.NEW) pushInstTypeArgs(frame, curBCI, top);
+                if (instructionTypeArgs[curBCI] != null && curOpcode != Bytecodes.NEW) {
                     top = top + instructionTypeArgs[curBCI].length;
                 }
 
@@ -2074,7 +2074,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     private StaticObject newReifiedObject(Klass klass, byte[] methodReifiedTypeValues, byte[][] classReifiedTypeValues){
         assert !klass.isPrimitive() : "Verifier guarantee";
         GuestAllocator.AllocationChecks.checkCanAllocateNewReference(getMethod().getMeta(), klass, true, this);
-        return getAllocator().createNewReified((ObjectKlass) klass, methodReifiedTypeValues, classReifiedTypeValues);
+        StaticObject obj = getAllocator().createNewReified((ObjectKlass) klass, methodReifiedTypeValues, classReifiedTypeValues);
+        return obj;
     }
 
     private static void setHiddenByteArray(ObjectKlass klass, StaticObject obj, byte[] reifiedValues){
@@ -2088,10 +2089,10 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             if (DEBUG) System.out.println("Cannot find hidden reified field in class: " + klass.getName().toString() + " in klass: " + obj.toVerboseString());
             return;
         } 
-        if (DEBUG) System.out.println("Setting hidden reified field"  + field.toString() +
+        field.setHiddenObject(obj, reifiedValues);
+        if (DEBUG) System.out.println("Set hidden reified field"  + field.toString() +
             " in class: " + klass.getName().toString() + " for obj: " + obj.toVerboseString() +
             " with reified values: " + Arrays.toString(reifiedValues));
-        field.setHiddenObject(obj, reifiedValues);
     }
 
     private StaticObject newPrimitiveArray(byte jvmPrimitiveType, int length) {
