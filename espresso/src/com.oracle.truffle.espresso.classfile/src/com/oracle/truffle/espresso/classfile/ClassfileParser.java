@@ -81,12 +81,11 @@ import com.oracle.truffle.espresso.classfile.attributes.SignatureAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.SourceDebugExtensionAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.SourceFileAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.StackMapTableAttribute;
-import com.oracle.truffle.espresso.classfile.attributes.reified.ClassTypeParameterCountAttribute;
-import com.oracle.truffle.espresso.classfile.attributes.reified.FieldTypeAttribute;
-import com.oracle.truffle.espresso.classfile.attributes.reified.InstructionTypeArgumentsAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.ClassGenericFieldListAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.ClassTypeParamListAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.ExtraBoxUnboxAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.InvokeReturnTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodParameterTypeAttribute;
-import com.oracle.truffle.espresso.classfile.attributes.reified.MethodReturnTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodTypeParameterCountAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.classfile.constantpool.ClassConstant;
@@ -1043,10 +1042,9 @@ public final class ClassfileParser {
         Attribute checkedExceptions = null;
         //newly added attributes
         MethodTypeParameterCountAttribute methodTypeParameterCount = null;
-        InstructionTypeArgumentsAttribute instructionTypeArguments = null;
         MethodParameterTypeAttribute methodParameterType = null;
         InvokeReturnTypeAttribute invokeReturnType = null;
-        MethodReturnTypeAttribute methodReturnType = null;
+        ExtraBoxUnboxAttribute extraBoxUnbox = null;
 
         CommonAttributeParser commonAttributeParser = new CommonAttributeParser(InfoType.Method);
 
@@ -1077,11 +1075,6 @@ public final class ClassfileParser {
                     throw classFormatError("Duplicate MethodTypeParameterCount attribute");
                 }
                 methodAttributes[i] = methodTypeParameterCount = parseMethodTypeParameterCount(attributeName);
-            } else if (attributeName.equals(ParserNames.InstructionTypeArguments)){
-                if (instructionTypeArguments != null){
-                    throw classFormatError("Duplicate InstructionTypeArguments attribute");
-                }
-                methodAttributes[i] = instructionTypeArguments = parseInstructionTypeArguments(attributeName);
             } else if (attributeName.equals(ParserNames.MethodParameterType)){
                 if (methodParameterType != null){
                     throw classFormatError("Duplicate MethodParameterType attribute");
@@ -1092,12 +1085,11 @@ public final class ClassfileParser {
                     throw classFormatError("Duplicate InvokeReturnType attribute");
                 }
                 methodAttributes[i] = invokeReturnType = parseInvokeReturnType(attributeName);
-            } else if (attributeName.equals(ParserNames.MethodReturnType)){
-                if (methodReturnType != null){
-                    throw classFormatError("Duplicate MethodReturnType attribute");
+            } else if (attributeName.equals(ParserNames.ExtraBoxUnbox)) {
+                if (extraBoxUnbox != null) {
+                    throw classFormatError("Duplicate ExtraBoxUnbox attribute");
                 }
-                methodAttributes[i] = methodReturnType = parseMethodReturnType(attributeName);
-
+                methodAttributes[i] = extraBoxUnbox = parseExtraBoxUnbox(attributeName);
             } else if (majorVersion >= JAVA_1_5_VERSION) {
                 if (attributeName.equals(ParserNames.RuntimeVisibleAnnotations)) {
                     RuntimeVisibleAnnotationsAttribute annotations = commonAttributeParser.parseRuntimeVisibleAnnotations(attributeSize, AnnotationLocation.Method);
@@ -1215,7 +1207,8 @@ public final class ClassfileParser {
         PermittedSubclassesAttribute permittedSubclasses = null;
         RecordAttribute record = null;
         //newly added class attribute
-        ClassTypeParameterCountAttribute classTypeParameterCount = null;
+        ClassTypeParamListAttribute classTypeParamList = null;
+        ClassGenericFieldListAttribute classGenericFieldList = null;
 
         CommonAttributeParser commonAttributeParser = new CommonAttributeParser(InfoType.Class);
 
@@ -1243,12 +1236,16 @@ public final class ClassfileParser {
                     throw classFormatError("Duplicate InnerClasses attribute");
                 }
                 classAttributes[i] = innerClasses = parseInnerClasses(attributeName);
-            } else if (attributeName.equals(ParserNames.ClassTypeParameterCount)){
-                if (classTypeParameterCount != null) {
-                    throw classFormatError("Duplicate ClassTypeParameterCount attribute");
+            } else if (attributeName.equals(ParserNames.ClassTypeParamList)){
+                if (classTypeParamList != null){
+                    throw classFormatError("Duplicate ClassTypeParamList attribute");
                 }
-                classAttributes[i] = classTypeParameterCount = parseClassTypeParameterCount(attributeName);
-                System.out.println("ClassTypeParameterCount: " + classTypeParameterCount + " for class:" + classType.toString());
+                classAttributes[i] = classTypeParamList = parseClassTypeParamList(attributeName);
+            } else if (attributeName.equals(ParserNames.ClassGenericFieldList)) {
+                if (classGenericFieldList != null) {
+                    throw classFormatError("Duplicate ClassGenericFieldList attribute");
+                }
+                classAttributes[i] = classGenericFieldList = parseClassGenericFieldList(attributeName);
             } else if (majorVersion >= JAVA_1_5_VERSION) {
                 if (majorVersion >= JAVA_7_VERSION && attributeName.equals(ParserNames.BootstrapMethods)) {
                     if (bootstrapMethods != null) {
@@ -1345,52 +1342,44 @@ public final class ClassfileParser {
     }
 
     /*
-    ClassTypeParameterCount_attribute {
+    ClassTypeParamList_attribute {
         u2 attribute_name_index;
         u4 attribute_length;
-        u2 count;
+        u2 class_type_param_num;
+        u2 type_param_field_ref_index[class_type_param_num];
     }
     */
-    private ClassTypeParameterCountAttribute parseClassTypeParameterCount(Symbol<Name> name) {
-        assert ParserNames.ClassTypeParameterCount.equals(name);
-        int count = stream.readU2();
-        return new ClassTypeParameterCountAttribute(name, count);
+    private ClassTypeParamListAttribute parseClassTypeParamList(Symbol<Name> name) {
+        assert ParserNames.ClassTypeParamList.equals(name);
+        int num = stream.readU2();
+        FieldRefConstant.Indexes[] fieldRefs = new FieldRefConstant.Indexes[num];
+        for (int i = 0; i < num; ++i) {
+            fieldRefs[i] = pool.fieldAt(stream.readU2());
+        }
+        return new ClassTypeParamListAttribute(name, fieldRefs);
     }
 
     /*
-    InstructionTypeArguments_attribute {
+    ClassGenericFieldList_attribute {
         u2 attribute_name_index;
         u4 attribute_length;
-        u2 typehint_length;
-        { 	u2 byecode_offset
-            u2 typeA_number
-            {	u1 K_M_indicator
-                u2 outer_class_indicator
-                u2 index
-            } typeAs[typeA_number]
-        } typeHints[typehint_length];
+        u2 class_generic_field_num;
+        {
+            u2 field_ref_index;
+            u2 class_type_param_index;
+        } generic_fields_info[class_generic_field_num];
     }
     */
-    private InstructionTypeArgumentsAttribute parseInstructionTypeArguments(Symbol<Name> name) {
-        assert ParserNames.InstructionTypeArguments.equals(name);
+    private ClassGenericFieldListAttribute parseClassGenericFieldList(Symbol<Name> name) {
+        assert ParserNames.ClassGenericFieldList.equals(name);
         int entryCount = stream.readU2();
-        if (entryCount == 0) {
-            return InstructionTypeArgumentsAttribute.EMPTY;
+        ClassGenericFieldListAttribute.Entry[] entries = new ClassGenericFieldListAttribute.Entry[entryCount];
+        for (int i = 0; i < entryCount; ++i) {
+            FieldRefConstant.Indexes fieldRef = pool.fieldAt(stream.readU2());
+            int typeParamIndex = stream.readU2();
+            entries[i] = new ClassGenericFieldListAttribute.Entry(fieldRef, typeParamIndex);
         }
-        InstructionTypeArgumentsAttribute.Entry[] entries = new InstructionTypeArgumentsAttribute.Entry[entryCount];
-        for (int i = 0; i < entryCount; i++) {
-            int bcOffset = stream.readU2();
-            int typeANum = stream.readU2();
-            TypeHints.TypeA[] typeArguments = new TypeHints.TypeA[typeANum];
-            for (int j = 0; j < typeANum; j++) {
-                byte kind = (byte) stream.readU1();
-                int outerClassIndicator = stream.readU2();
-                int index = stream.readU2();
-                typeArguments[j] = new TypeHints.TypeA(kind, outerClassIndicator, index);
-            }
-            entries[i] = new InstructionTypeArgumentsAttribute.Entry(bcOffset, typeArguments);
-        }
-        return new InstructionTypeArgumentsAttribute(name, entries);
+        return new ClassGenericFieldListAttribute(name, entries);
     }
 
     /*
@@ -1398,101 +1387,68 @@ public final class ClassfileParser {
         u2 attribute_name_index;
         u4 attribute_length;
         u2 parameter_count;
-        {	u1 K_M_indicator
-            u2 outer_class_indicator
+        {
+            u1 K_M_indicator
             u2 index
-        } typeBs[parameter_count];
+        } param_types[parameter_count];
     }
     */
     private MethodParameterTypeAttribute parseMethodParameterType(Symbol<Name> name) {
         assert ParserNames.MethodParameterType.equals(name);
         int parameterCount = stream.readU2();
-        if (parameterCount == 0) {
-            return MethodParameterTypeAttribute.EMPTY;
-        }
-        TypeHints.TypeB[] typeBs = new TypeHints.TypeB[parameterCount];
+        TypeHints.TypeB[] paramTypes = new TypeHints.TypeB[parameterCount];
         for (int i = 0; i < parameterCount; i++) {
             byte kind = (byte) stream.readU1();
-            int outerClassIndicator = stream.readU2();
             int index = stream.readU2();
             if (kind != TypeHints.TypeB.EMPTY_KIND) {
-                typeBs[i] = new TypeHints.TypeB(kind, outerClassIndicator, index);
+                paramTypes[i] = new TypeHints.TypeB(kind, index);
             } // else remain null
         }
-        return new MethodParameterTypeAttribute(name, parameterCount, typeBs);
+        return new MethodParameterTypeAttribute(name, paramTypes);
     }
 
     /*
     InvokeReturnType_attribute {
         u2 attribute_name_index;
         u4 attribute_length;
-        u2 typehint_length;
-        { 	u2 byecode_offset
+        u2 typehint_num;
+        {
+            u2 bytecode_offset
             u1 K_M_indicator
-            u2 outer_class_indicator
             u2 index
-        } typeHints[typehint_length];
+        } typeHints[typehint_num];
     }
     */
     private InvokeReturnTypeAttribute parseInvokeReturnType(Symbol<Name> name) {
         assert ParserNames.InvokeReturnType.equals(name);
-        int typeHintLength = stream.readU2();
-        if (typeHintLength == 0) {
-            return InvokeReturnTypeAttribute.EMPTY;
-        }
-        InvokeReturnTypeAttribute.Entry[] entries = new InvokeReturnTypeAttribute.Entry[typeHintLength];
-        for (int i = 0; i < typeHintLength; i++) {
+        int typeHintNum = stream.readU2();
+        InvokeReturnTypeAttribute.Entry[] entries = new InvokeReturnTypeAttribute.Entry[typeHintNum];
+        for (int i = 0; i < typeHintNum; i++) {
             int bcOffset = stream.readU2();
             byte kind = (byte) stream.readU1();
-            int outerClassIndicator = stream.readU2();
             int index = stream.readU2();
             entries[i] = new InvokeReturnTypeAttribute.Entry(
-                bcOffset, kind != TypeHints.TypeB.EMPTY_KIND ? (new TypeHints.TypeB(kind, outerClassIndicator, index)) : null);
+                bcOffset, kind != TypeHints.TypeB.EMPTY_KIND ? new TypeHints.TypeB(kind, index) : null);
         }
         return new InvokeReturnTypeAttribute(name, entries);
     }
 
     /*
-    InvokeReturnType_attribute {
+    ExtraBoxUnbox_attribute{
         u2 attribute_name_index;
         u4 attribute_length;
-        u2 typehint_length;
-        { 	u2 byecode_offset
-            u1 K_M_indicator
-            u2 outer_class_indicator
-            u2 index
-        } typeHints[typehint_length];
+        u2 count;
+        u2 bytecode_offsets[count];
     }
     */
-    private MethodReturnTypeAttribute parseMethodReturnType(Symbol<Name> name) {
-        assert ParserNames.MethodReturnType.equals(name);
-        byte kind = (byte) stream.readU1();
-        int outerClassIndicator = stream.readU2();
-        int index = stream.readU2();
-        return new MethodReturnTypeAttribute(name, 
-            kind != TypeHints.TypeB.EMPTY_KIND ? 
-            (new TypeHints.TypeB(kind, outerClassIndicator, index)) 
-            : null);
-    }
-
-    /*
-    FieldType_attribute{
-        u2 attribute_name_index;
-        u4 attribute_length;
-        u1 K_M_indicator; (should be always K?)
-        u2 outer_class_indicator
-        u2 index;
-    }
-    */
-    private FieldTypeAttribute parseFieldType(Symbol<Name> name) {
-        assert ParserNames.FieldType.equals(name);
-        byte kind = (byte) stream.readU1();
-        int outerClassIndicator = stream.readU2();
-        int index = stream.readU2();
-        return new FieldTypeAttribute(name, 
-            kind != TypeHints.TypeB.EMPTY_KIND ? 
-            (new TypeHints.TypeB(kind, outerClassIndicator, index)) 
-            : null);
+    private ExtraBoxUnboxAttribute parseExtraBoxUnbox(Symbol<Name> name) {
+        assert ParserNames.ExtraBoxUnbox.equals(name);
+        int count = stream.readU2();
+        int[] bcOffsets = new int[count];
+        for (int i = 0; i < count; ++i) {
+            bcOffsets[i] = stream.readU2();
+        }
+        return new ExtraBoxUnboxAttribute(name, bcOffsets);
     }
 
     private LineNumberTableAttribute parseLineNumberTable(Symbol<Name> name) {
@@ -2020,7 +1976,6 @@ public final class ClassfileParser {
         ConstantValueAttribute constantValue = null;
         CommonAttributeParser commonAttributeParser = new CommonAttributeParser(InfoType.Field);
         //newly added Field attribute
-        FieldTypeAttribute fieldTypeAttribute = null;
 
         for (int i = 0; i < attributeCount; ++i) {
             final int attributeNameIndex = stream.readU2();
@@ -2050,12 +2005,6 @@ public final class ClassfileParser {
             } else if (attributeName.equals(ParserNames.Synthetic)) {
                 fieldFlags |= ACC_SYNTHETIC;
                 fieldAttributes[i] = new Attribute(attributeName, null);
-            } else if (attributeName.equals(ParserNames.FieldType)) {
-                if (fieldTypeAttribute != null) {
-                    throw classFormatError("Duplicate FieldType attribute");
-                }
-                fieldAttributes[i] = fieldTypeAttribute = parseFieldType(attributeName);
-                System.out.println("FieldType attribute: " + fieldTypeAttribute + " for field: " + name + " in class: " + classType.toString());
             } else if (majorVersion >= JAVA_1_5_VERSION) {
                 if (attributeName.equals(ParserNames.RuntimeVisibleAnnotations)) {
                     RuntimeVisibleAnnotationsAttribute annotations = commonAttributeParser.parseRuntimeVisibleAnnotations(attributeSize, AnnotationLocation.Field);
