@@ -8,8 +8,6 @@ import com.oracle.truffle.espresso.classfile.descriptors.Symbol;
 public class MethodTypeParameterCountAttribute extends Attribute {
 
     public static final Symbol<Name> NAME = ParserNames.MethodTypeParameterCount;
-    
-    public static final MethodTypeParameterCountAttribute EMPTY = new MethodTypeParameterCountAttribute(NAME, 0);
 
     private final int count;
 

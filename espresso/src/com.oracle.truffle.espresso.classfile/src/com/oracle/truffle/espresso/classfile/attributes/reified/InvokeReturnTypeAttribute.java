@@ -10,30 +10,7 @@ import com.oracle.truffle.espresso.classfile.descriptors.Symbol;
 public class InvokeReturnTypeAttribute extends Attribute {
     public static final Symbol<Name> NAME = ParserNames.InvokeReturnType;
 
-    public static final InvokeReturnTypeAttribute EMPTY = new InvokeReturnTypeAttribute(NAME, Entry.EMPTY_ARRAY);
-
-    public static final class Entry {
-        public static final Entry[] EMPTY_ARRAY = new Entry[0];
-        private final int bytecodeOffset;
-        private final TypeHints.TypeB returnType;
-        public Entry(int bytecodeOffset, TypeHints.TypeB returnType) {
-            this.bytecodeOffset = bytecodeOffset;
-            this.returnType = returnType;
-        }
-        public int getBytecodeOffset() {
-            return bytecodeOffset;
-        }
-        public TypeHints.TypeB getReturnType() {
-            return returnType;
-        }
-        @Override
-        public String toString() {
-            return "Entry{" +
-                            "bytecodeOffset=" + bytecodeOffset +
-                            ", returnType=" + returnType +
-                            '}';
-        }
-    }
+    public record Entry(int bytecodeOffset, TypeHints.TypeB returnType) {}
 
     private final Entry[] entries;
 
