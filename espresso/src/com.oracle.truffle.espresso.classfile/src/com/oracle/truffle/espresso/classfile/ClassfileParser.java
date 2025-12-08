@@ -84,6 +84,7 @@ import com.oracle.truffle.espresso.classfile.attributes.StackMapTableAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.ClassGenericFieldListAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.ClassTypeParamListAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.ExtraBoxUnboxAttribute;
+import com.oracle.truffle.espresso.classfile.attributes.reified.FieldTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.InvokeReturnTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodParameterTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodTypeParameterCountAttribute;
@@ -1451,6 +1452,13 @@ public final class ClassfileParser {
         return new ExtraBoxUnboxAttribute(name, bcOffsets);
     }
 
+    private FieldTypeAttribute parseFieldType(Symbol<Name> name) {
+        assert ParserNames.FieldType.equals(name);
+        byte kind = (byte) stream.readU1();
+        int index = stream.readU2();
+        return new FieldTypeAttribute(name, kind != TypeHints.TypeB.EMPTY_KIND ? new TypeHints.TypeB(kind, index) : null);
+    }
+
     private LineNumberTableAttribute parseLineNumberTable(Symbol<Name> name) {
         assert ParserNames.LineNumberTable.equals(name);
         int entryCount = stream.readU2();
@@ -1976,6 +1984,7 @@ public final class ClassfileParser {
         ConstantValueAttribute constantValue = null;
         CommonAttributeParser commonAttributeParser = new CommonAttributeParser(InfoType.Field);
         //newly added Field attribute
+        FieldTypeAttribute fieldTypeAttribute = null;
 
         for (int i = 0; i < attributeCount; ++i) {
             final int attributeNameIndex = stream.readU2();
@@ -2005,6 +2014,12 @@ public final class ClassfileParser {
             } else if (attributeName.equals(ParserNames.Synthetic)) {
                 fieldFlags |= ACC_SYNTHETIC;
                 fieldAttributes[i] = new Attribute(attributeName, null);
+            } else if (attributeName.equals(ParserNames.FieldType)) {
+                if (fieldTypeAttribute != null) {
+                    throw classFormatError("Duplicate FieldType attribute");
+                }
+                fieldAttributes[i] = fieldTypeAttribute = parseFieldType(attributeName);
+                System.out.println("FieldType attribute: " + fieldTypeAttribute + " for field: " + name + " in class: " + classType.toString());
             } else if (majorVersion >= JAVA_1_5_VERSION) {
                 if (attributeName.equals(ParserNames.RuntimeVisibleAnnotations)) {
                     RuntimeVisibleAnnotationsAttribute annotations = commonAttributeParser.parseRuntimeVisibleAnnotations(attributeSize, AnnotationLocation.Field);

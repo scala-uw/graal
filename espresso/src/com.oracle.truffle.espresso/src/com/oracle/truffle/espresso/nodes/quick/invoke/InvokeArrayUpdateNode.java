@@ -32,35 +32,35 @@ public final class InvokeArrayUpdateNode extends InvokeScalaNode {
         EspressoLanguage language = getLanguage();
         CompilerAsserts.partialEvaluationConstant(arrayElementType);
         switch (arrayElementType) {
-            case TypeHints.TypeA.BYTE:
+            case TypeHints.BYTE:
                 byte newByte = (byte) EspressoFrame.popInt(frame, top - 1);
                 getContext().getInterpreterToVM().setArrayByte(language, newByte, index, array);
                 break;
-            case TypeHints.TypeA.CHAR:
+            case TypeHints.CHAR:
                 char newChar = (char) EspressoFrame.popInt(frame, top - 1);
                 getContext().getInterpreterToVM().setArrayChar(language, newChar, index, array);
                 break;
-            case TypeHints.TypeA.DOUBLE:
+            case TypeHints.DOUBLE:
                 double newDouble = EspressoFrame.popDouble(frame, top - 1);
                 getContext().getInterpreterToVM().setArrayDouble(language, newDouble, index, array);
                 break;
-            case TypeHints.TypeA.FLOAT:
+            case TypeHints.FLOAT:
                 float newFloat = EspressoFrame.popFloat(frame, top - 1);
                 getContext().getInterpreterToVM().setArrayFloat(language, newFloat, index, array);
                 break;
-            case TypeHints.TypeA.INT:
+            case TypeHints.INT:
                 int newInt = EspressoFrame.popInt(frame, top - 1);
                 getContext().getInterpreterToVM().setArrayInt(language, newInt, index, array);
                 break;
-            case TypeHints.TypeA.LONG:
+            case TypeHints.LONG:
                 long newLong = EspressoFrame.popLong(frame, top - 1);
                 getContext().getInterpreterToVM().setArrayLong(language, newLong, index, array);
                 break;
-            case TypeHints.TypeA.SHORT:
+            case TypeHints.SHORT:
                 short newShort = (short) EspressoFrame.popInt(frame, top - 1);
                 getContext().getInterpreterToVM().setArrayShort(language, newShort, index, array);
                 break;
-            case TypeHints.TypeA.BOOLEAN:
+            case TypeHints.BOOLEAN:
                 byte newBool = (byte) EspressoFrame.popInt(frame, top - 1);
                 getContext().getInterpreterToVM().setArrayByte(language, newBool, index, array);
                 break;

@@ -190,14 +190,14 @@ final class LinkedKlassFieldLayout {
         LinkedField field = new LinkedField(parserField, slot, idMode);
         Class<?> fieldType;
         switch (reifiedType) {
-            case TypeHints.TypeA.BYTE: fieldType = byte.class; break;
-            case TypeHints.TypeA.CHAR: fieldType = char.class; break;
-            case TypeHints.TypeA.DOUBLE: fieldType = double.class; break;
-            case TypeHints.TypeA.FLOAT: fieldType = float.class; break;
-            case TypeHints.TypeA.INT: fieldType = int.class; break;
-            case TypeHints.TypeA.LONG: fieldType = long.class; break;
-            case TypeHints.TypeA.SHORT: fieldType = short.class; break;
-            case TypeHints.TypeA.BOOLEAN: fieldType = boolean.class; break;
+            case TypeHints.BYTE: fieldType = byte.class; break;
+            case TypeHints.CHAR: fieldType = char.class; break;
+            case TypeHints.DOUBLE: fieldType = double.class; break;
+            case TypeHints.FLOAT: fieldType = float.class; break;
+            case TypeHints.INT: fieldType = int.class; break;
+            case TypeHints.LONG: fieldType = long.class; break;
+            case TypeHints.SHORT: fieldType = short.class; break;
+            case TypeHints.BOOLEAN: fieldType = boolean.class; break;
             default: fieldType = StaticObject.class; break; //can never be hidden fields
         }
         builder.property(field, fieldType, storeAsFinal(parserKlass, parserField));

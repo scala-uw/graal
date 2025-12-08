@@ -38,7 +38,6 @@ public abstract class InvokeQuickNode extends QuickNode {
     // Helper information for easier arguments handling.
     protected final int resultAt;
     protected final int stackEffect;
-    protected final int typeArgCnt;
 
     // Helps check for no foreign objects
     private final boolean returnsPrimitive;
@@ -46,9 +45,7 @@ public abstract class InvokeQuickNode extends QuickNode {
     public InvokeQuickNode(Method m, int top, int callerBCI) {
         super(top, callerBCI);
         this.method = m.getMethodVersion();
-        MethodTypeParameterCountAttribute attr = m.getMethodTypeParameterCountAttribute();
-        this.typeArgCnt = (attr != null ? attr.getCount() : 0);
-        this.resultAt = top - this.typeArgCnt -(SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
+        this.resultAt = top -(SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.returnsPrimitive = m.getReturnKind().isPrimitive();
     }
@@ -57,20 +54,9 @@ public abstract class InvokeQuickNode extends QuickNode {
         super(top, callerBCI);
         this.method = version;
         Method m = version.getMethod();
-        MethodTypeParameterCountAttribute attr = m.getMethodTypeParameterCountAttribute();
-        this.typeArgCnt = (attr != null ? attr.getCount() : 0);
-        this.resultAt = top - this.typeArgCnt - (SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
+        this.resultAt = top - (SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.returnsPrimitive = m.getReturnKind().isPrimitive();
-    }
-
-    public InvokeQuickNode(Method method, int top, int callerBCI, int typeArgCnt) {
-        super(top, callerBCI);
-        this.method = method.getMethodVersion();
-        this.typeArgCnt = typeArgCnt;
-        this.resultAt = top - typeArgCnt - (SignatureSymbols.slotsForParameters(method.getParsedSignature()) + (method.hasReceiver() ? 1 : 0));
-        this.stackEffect = (resultAt - top) + method.getReturnKind().getSlotCount();
-        this.returnsPrimitive = method.getReturnKind().isPrimitive();
     }
 
     public final StaticObject peekReceiver(VirtualFrame frame) {
@@ -87,12 +73,11 @@ public abstract class InvokeQuickNode extends QuickNode {
          * Method signature does not change across methods. Can safely use the constant signature
          * from `method` instead of the non-constant signature from the lookup.
          */
-        if (method.isStatic() && method.getMethod().getParameterCount() == 0 && this.typeArgCnt == 0) {
+        if (method.isStatic() && method.getMethod().getParameterCount() == 0) {
             // Don't create an array for empty arguments.
             return EMPTY_ARGS;
         }
-        Object[] res = EspressoFrame.popArguments(frame, top, !method.isStatic(), method.getMethod().getParsedSignature(), 
-                        this.typeArgCnt);
+        Object[] res = EspressoFrame.popArguments(frame, top, !method.isStatic(), method.getMethod().getParsedSignature());
         return res;
     }
 

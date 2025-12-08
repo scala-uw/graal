@@ -91,10 +91,8 @@ import com.oracle.truffle.espresso.classfile.attributes.ExceptionsAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.LineNumberTableAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.LocalVariableTable;
 import com.oracle.truffle.espresso.classfile.attributes.SignatureAttribute;
-import com.oracle.truffle.espresso.classfile.attributes.reified.InstructionTypeArgumentsAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.InvokeReturnTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodParameterTypeAttribute;
-import com.oracle.truffle.espresso.classfile.attributes.reified.MethodReturnTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodTypeParameterCountAttribute;
 import com.oracle.truffle.espresso.classfile.bytecode.BytecodeStream;
 import com.oracle.truffle.espresso.classfile.bytecode.Bytecodes;
@@ -286,20 +284,12 @@ public final class Method extends Member<Signature> implements MethodRef, Truffl
         return (MethodTypeParameterCountAttribute) getAttribute(MethodTypeParameterCountAttribute.NAME);
     }
 
-    public InstructionTypeArgumentsAttribute getInstructionTypeArgumentsAttribute() {
-        return (InstructionTypeArgumentsAttribute) getAttribute(InstructionTypeArgumentsAttribute.NAME);
-    }
-
     public MethodParameterTypeAttribute getMethodParameterTypeAttribute() {
         return (MethodParameterTypeAttribute) getAttribute(MethodParameterTypeAttribute.NAME);
     }
 
     public InvokeReturnTypeAttribute getInvokeReturnTypeAttribute() {
         return (InvokeReturnTypeAttribute) getAttribute(InvokeReturnTypeAttribute.NAME);
-    }
-
-    public MethodReturnTypeAttribute getMethodReturnTypeAttribute() {
-        return (MethodReturnTypeAttribute) getAttribute(MethodReturnTypeAttribute.NAME);
     }
 
     @Override

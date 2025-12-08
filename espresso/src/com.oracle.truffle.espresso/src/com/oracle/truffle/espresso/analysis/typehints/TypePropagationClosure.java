@@ -62,6 +62,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
     private final int maxStack;
     private final InvokeReturnTypeAttribute.Entry[] invokeReturnTypeAttributes;
     private final int codeLength;
+    private boolean nonTrivial;
 
     private final boolean debug = false;
 
@@ -73,13 +74,14 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     int maxStack,
                     int totalBlocks) {
         this.ctx = ctx;
-        this.codeLength = codeLength;
         this.resAtBCI = new TypeAnalysisResult[codeLength + 1];
+        this.resAtBlockEnd = new TypeAnalysisState[totalBlocks];
         this.methodVersion = methodVersion;
         this.maxLocals = maxLocals;
         this.maxStack = maxStack;
-        this.resAtBlockEnd = new TypeAnalysisState[totalBlocks];
         InvokeReturnTypeAttribute attr = getMethod().getInvokeReturnTypeAttribute();
+        this.codeLength = codeLength;
+        this.nonTrivial = false;
         this.invokeReturnTypeAttributes = 
         (attr == null ? null : attr.getEntries());
     }
@@ -102,24 +104,23 @@ public class TypePropagationClosure extends BlockIteratorClosure{
         //root block: method entry
         if (block.predecessorsID().length == 0){
             TypeAnalysisState rootState = new TypeAnalysisState(maxLocals, maxStack);
-            MethodParameterTypeAttribute methodParameterTypeAttribute = 
-                getMethod().getMethodParameterTypeAttribute();
-            if (methodParameterTypeAttribute == null) return rootState;
+            MethodParameterTypeAttribute methodParameterTypeAttribute = getMethod().getMethodParameterTypeAttribute();
             Symbol<Type>[] signature = getMethod().getParsedSignature();
-            int paramCnt = SignatureSymbols.parameterCount(signature);
-            TypeHints.TypeB[] methodParameterTypes = 
-                methodParameterTypeAttribute.getParameterTypes();
-            int localIndex = getMethod().isStatic() ? 0 : 1; //skip 'this' for non-static methods
-            for (int i = 0; i < paramCnt; i++){
-                Symbol<Type> cur = SignatureSymbols.parameterType(signature, i);
-                if (cur.byteAt(0) == 'J' || cur.byteAt(0) == 'D'){
-                    assert methodParameterTypes[i] == null;
-                    rootState.locals[localIndex] = null;
-                    localIndex ++;
-                } else {
-                    rootState.locals[localIndex] = methodParameterTypes[i];
+            if (methodParameterTypeAttribute != null) {
+                TypeHints.TypeB[] methodParameterTypes = methodParameterTypeAttribute.getParameterTypes();
+                int localIndex = getMethod().isStatic() ? 0 : 1; //skip 'this' for non-static methods
+                for (int i = 0; i < methodParameterTypes.length; i++) {
+                    Symbol<Type> cur = SignatureSymbols.parameterType(signature, i);
+                    if (cur.byteAt(0) == 'J' || cur.byteAt(0) == 'D'){
+                        assert methodParameterTypes[i] == null;
+                        rootState.locals[localIndex] = null;
+                        localIndex++;
+                    } else {
+                        rootState.locals[localIndex] = methodParameterTypes[i];
+                        if (methodParameterTypes[i] != null) nonTrivial = true;
+                    }
+                    localIndex++;
                 }
-                localIndex++;
             }
             return rootState;
             
@@ -141,14 +142,10 @@ public class TypePropagationClosure extends BlockIteratorClosure{
         while (bci <= block.end()){
             int opcode = bs.currentBC(bci);
             int cpi; int stackEffect; TypeHints.TypeB tmp;
-            if (debug) System.out.println("Processing BCI: " + bci + " opcode: " + Bytecodes.nameOf(opcode));
-            if (debug) System.out.println("Current state: " + state);
             switch (opcode){
                 case ARETURN:
                     assert state.stackTop > 0;
-                    this.resAtBCI[bci] = 
-                        new TypeAnalysisResult(new TypeHints.TypeB[]{state.stack[state.stackTop - 1]});
-                    if (debug) System.out.println("Areturn stack top: " + state.stack[state.stackTop - 1]);
+                    this.resAtBCI[bci] = new TypeAnalysisResult(new TypeHints.TypeB[]{state.stack[state.stackTop - 1]});
                     break;
                 case ASTORE:
                 case ASTORE_0:
@@ -158,7 +155,6 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     int astoreIndex = opcode == ASTORE ? bs.readLocalIndex(bci) : (opcode - ASTORE_0);
                     assert state.stackTop > 0;
                     this.resAtBCI[bci] = new TypeAnalysisResult(new TypeHints.TypeB[]{state.stack[state.stackTop - 1]});
-                    if (debug) System.out.println("Astore index: " + astoreIndex + " stack top: " + state.stack[state.stackTop - 1]);
                     if (state.stackTop > 0){
                         if (state.stack[state.stackTop - 1] == null){
                             state.locals[astoreIndex] = null;
@@ -252,14 +248,14 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                         assert xs_type_kind == TypeHints.TypeB.ARR_CLASS_TYPE_PARAM
                             || xs_type_kind == TypeHints.TypeB.ARR_METHOD_TYPE_PARAM;
                         if (xs_type_kind == TypeHints.TypeB.ARR_CLASS_TYPE_PARAM) {
-                            // TODO: class type params
+                            state.stack[state.stackTop - 3] = new TypeHints.TypeB(TypeHints.TypeB.CLASS_TYPE_PARAM, xs_type.getIndex());
                         } else { // ARR_METHOD_TYPE_PARAM
-                            state.stack[state.stackTop - 3] = new TypeHints.TypeB(TypeHints.TypeB.METHOD_TYPE_PARAM, 0, xs_type.getIndex());
+                            state.stack[state.stackTop - 3] = new TypeHints.TypeB(TypeHints.TypeB.METHOD_TYPE_PARAM, xs_type.getIndex());
                         }
                         TypeHints.TypeB[] argsHint = new TypeHints.TypeB[2];
                         assert state.stack[state.stackTop - 1] == null;
                         argsHint[0] = xs_type;
-                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, false);
+                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, false, false);
                         state.stackTop -= 2;
                         break;
                     }
@@ -268,7 +264,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                         argsHint[0] = state.stack[state.stackTop - 3];
                         assert state.stack[state.stackTop - 2] == null;
                         argsHint[2] = state.stack[state.stackTop - 1];
-                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, false);
+                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, false, false);
                         state.stackTop -= 4;
                         break;
                     }
@@ -286,36 +282,28 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                             argsHint[i] = state.stack[--state.stackTop];
                         }
                     }
-                    this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, true);
+                    this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, true, false); // TODO: ignore some calls here
                     if (!resolvedMethod.isStatic()) {
                         assert state.stack[state.stackTop - 1] == null; // We should ban calling methods of Any (e.g. hashCode) on a value typed T
                         --state.stackTop;
                     }
-                    
-                    if (debug) System.out.println("Resolved method: " + resolvedMethod.getName() + " at bci: " + bci 
-                        + " with param count: " + paramCnt);
 
                     int returnValueSlotCount = resolvedMethod.getReturnKind().getSlotCount();
 
                     TypeHints.TypeB returnType = null;
                     if (invokeReturnTypeAttributes != null){
-                        for (InvokeReturnTypeAttribute.Entry invokeReturnTypeAttribute : invokeReturnTypeAttributes) {
-                            if (invokeReturnTypeAttribute.getBytecodeOffset() == bci) {
-                                returnType = invokeReturnTypeAttribute.getReturnType();
+                        for (InvokeReturnTypeAttribute.Entry invokeReturnTypeEntry : invokeReturnTypeAttributes) {
+                            if (invokeReturnTypeEntry.bytecodeOffset() == bci) {
+                                returnType = invokeReturnTypeEntry.returnType();
                                 break;
                             }
                         }
                     }
-                    if (returnType != null){
-                        if (debug) System.out.println("method return type of method " + resolvedMethod.getName() + ": " + returnType);
-                        for (int i = 0; i < returnValueSlotCount; i++){
-                            state.stack[state.stackTop++] = returnType;
-                        }
-                    } else {
-                        //no type hints for the return value
-                        for (int i = 0; i < returnValueSlotCount; i++){
-                            state.stack[state.stackTop++] = null;
-                        }
+                    if (returnType != null) {
+                        nonTrivial = true;
+                    }
+                    for (int i = 0; i < returnValueSlotCount; ++i) {
+                        state.stack[state.stackTop++] = returnType;
                     }
                     break;
                 case DUP:
@@ -381,11 +369,15 @@ public class TypePropagationClosure extends BlockIteratorClosure{
     }
 
     public TypeAnalysisResult[] getRes() {
-        /*  for a method, BytecodeNode.java adds a RETURN_VALUE opcode
-            at the very end, so we copy the result for RETURN to it
-        */
-        resAtBCI[codeLength] = resAtBCI[codeLength - 1];
-        return resAtBCI;
+        if (nonTrivial) {
+            /*  for a method, BytecodeNode.java adds a RETURN_VALUE opcode
+                at the very end, so we copy the result for RETURN to it
+            */
+            resAtBCI[codeLength] = resAtBCI[codeLength - 1];
+            return resAtBCI;
+        } else {
+            return null;
+        }
     }
     
 }

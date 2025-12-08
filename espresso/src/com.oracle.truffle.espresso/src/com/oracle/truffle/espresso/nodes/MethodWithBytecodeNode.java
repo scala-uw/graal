@@ -64,7 +64,7 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
     
     @CompilerDirectives.CompilationFinal
     private int typeParamCount = 0;
-    private TypeAnalysisResult[] analysis = null;
+    private TypeAnalysisResult[] analysis;
     private final Method.MethodVersion methodVersion;
     private final boolean trivialBytecode;
     
@@ -89,15 +89,10 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
         MethodTypeParameterCountAttribute attr = methodVersion.getMethod().getMethodTypeParameterCountAttribute();
         this.typeParamCount = attr != null ? attr.getCount() : 0;
 
-        if (this.typeParamCount != 0) {
-            this.analysis = TypeHintAnalysis.analyze(methodVersion, SHOW_TYPEANALYSIS).getRes();
+        this.analysis = TypeHintAnalysis.analyze(methodVersion);
+        if (this.analysis != null) {
             this.bytecodeNode = null;
-            byte[] bt = new byte[typeParamCount];
-            for (int i =0; i < typeParamCount; i++){
-                bt[i] = TypeHints.TypeA.REFERENCE;
-            }
-            this.frameDescriptor = new BytecodeNode(methodVersion, null, bt).getFrameDescriptor();
-
+            this.frameDescriptor = BytecodeNode.calcFrameDescriptor(methodVersion);
             this.specializations = new BytecodeNode[0];
             this.cacheKeys = new byte[0][];
         } else {
@@ -168,33 +163,6 @@ final class MethodWithBytecodeNode extends EspressoInstrumentableRootNodeImpl {
 
         return node;        
     }
-
-    // private static final class ByteKey{
-    //     private final byte[] key;
-    //     private final int hash;
-
-    //     ByteKey(byte[] key){
-    //         this.key = key;
-    //         this.hash = Arrays.hashCode(key);
-    //     }
-
-    //     @Override
-    //     public boolean equals(Object obj) {
-    //         if (this == obj) {
-    //             return true;
-    //         }
-    //         if (obj instanceof ByteKey){
-    //             ByteKey other = (ByteKey) obj;
-    //             return Arrays.equals(this.key, other.key);
-    //         }
-    //         return false;
-    //     }
-
-    //     @Override
-    //     public int hashCode() {
-    //         return hash;
-    //     }
-    // }
 
     @Override
     @SuppressFBWarnings(value = "BC_IMPOSSIBLE_INSTANCEOF", justification = "bytecodeNode may be replaced by instrumentation with a wrapper node")

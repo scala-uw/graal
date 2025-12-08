@@ -364,21 +364,16 @@ public final class EspressoFrame {
     }
 
     @ExplodeLoop
-    public static Object[] popArguments(VirtualFrame frame, int top, boolean hasReceiver, final Symbol<Type>[] signature, int typeParamsCnt) {
+    public static Object[] popArguments(VirtualFrame frame, int top, boolean hasReceiver, final Symbol<Type>[] signature) {
         int argCount = SignatureSymbols.parameterCount(signature);
         int extraParam = hasReceiver ? 1 : 0;
-        final Object[] args = new Object[argCount + extraParam + typeParamsCnt];
+        final Object[] args = new Object[argCount + extraParam];
 
         CompilerAsserts.partialEvaluationConstant(argCount);
         CompilerAsserts.partialEvaluationConstant(signature);
         CompilerAsserts.partialEvaluationConstant(hasReceiver);
-        CompilerAsserts.partialEvaluationConstant(typeParamsCnt);
         
         int argAt = top - 1;
-        for (int i = typeParamsCnt - 1; i >= 0; --i) {
-            args[argCount + extraParam + i] = (byte) popInt(frame, argAt);
-            --argAt;
-        }
         for (int i = argCount - 1; i >= 0; --i) {
             Symbol<Type> argType = SignatureSymbols.parameterType(signature, i);
             // @formatter:off
