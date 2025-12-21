@@ -1,12 +1,15 @@
 package com.oracle.truffle.espresso.analysis.typehints;
 
+import java.util.AbstractSet;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import com.oracle.truffle.espresso.analysis.AnalysisProcessor;
 import com.oracle.truffle.espresso.analysis.BlockIterator;
 import com.oracle.truffle.espresso.analysis.BlockIteratorClosure;
 import com.oracle.truffle.espresso.analysis.graph.LinkedBlock;
+import com.oracle.truffle.espresso.classfile.attributes.reified.ExtraBoxUnboxAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.InvokeReturnTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodParameterTypeAttribute;
 import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
@@ -61,6 +64,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
     private final int maxLocals;
     private final int maxStack;
     private final InvokeReturnTypeAttribute.Entry[] invokeReturnTypeAttributes;
+    private final AbstractSet<Integer> ignoredCalls;
     private final int codeLength;
     private boolean nonTrivial;
 
@@ -82,8 +86,13 @@ public class TypePropagationClosure extends BlockIteratorClosure{
         InvokeReturnTypeAttribute attr = getMethod().getInvokeReturnTypeAttribute();
         this.codeLength = codeLength;
         this.nonTrivial = false;
-        this.invokeReturnTypeAttributes = 
-        (attr == null ? null : attr.getEntries());
+        this.invokeReturnTypeAttributes = attr == null ? null : attr.getEntries();
+        ExtraBoxUnboxAttribute ignoreAttr = getMethod().getExtraBoxUnboxAttribute();
+        if (ignoreAttr != null) {
+            this.ignoredCalls = ignoreAttr.getBCOffsets();
+        } else {
+            this.ignoredCalls = new HashSet<>();
+        }
     }
 
     @Override
@@ -266,6 +275,10 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                         argsHint[2] = state.stack[state.stackTop - 1];
                         this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, false, false);
                         state.stackTop -= 4;
+                        break;
+                    }
+                    if (ignoredCalls.contains(bci)) {
+                        this.resAtBCI[bci] = new TypeAnalysisResult(new TypeHints.TypeB[0], true, true);
                         break;
                     }
                     

@@ -487,6 +487,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     private final byte[][] instOperandArrayElementTypes;
     @CompilationFinal(dimensions = 1)
     private final boolean[] isInvoke;
+    @CompilationFinal(dimensions = 1)
+    private final boolean[] ignoreInvoke;
 
     @CompilerDirectives.CompilationFinal
     public static final boolean DEBUG = false;
@@ -535,9 +537,11 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         this.instOperandArrayElementTypes = new byte[this.bs.endBCI()][];
         if (instOperandTypeHints != null) {
             this.isInvoke = new boolean[instOperandTypeHints.length];
+            this.ignoreInvoke = new boolean[instOperandTypeHints.length];
             for (int i = 0; i < instOperandTypeHints.length; ++i) {
                 if (instOperandTypeHints[i] != null) {
                     this.isInvoke[i] = instOperandTypeHints[i].isInvoke;
+                    this.ignoreInvoke[i] = instOperandTypeHints[i].ignoreInvoke;
                     int len = instOperandTypeHints[i].operands.length;
                     instOperandTypes[i] = new byte[len];
                     instOperandArrayElementTypes[i] = new byte[len];
@@ -556,10 +560,12 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     }
                 } else {
                     this.isInvoke[i] = false;
+                    this.ignoreInvoke[i] = false;
                 }
             }
         } else {
             this.isInvoke = null;
+            this.ignoreInvoke = null;
         }
 
         this.frameDescriptor = calcFrameDescriptor(methodVersion);
@@ -625,27 +631,26 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 case 'D' : setLocalDouble(frame, curSlot, (double) arguments[i + receiverSlot]); ++curSlot; break;
                 case '[' : // fall through
                 case 'L' : {
-                    // Reference type. unbox refied values if annotated with type hints.
-                        StaticObject argument = (StaticObject) arguments[i + receiverSlot];
                         CompilerAsserts.partialEvaluationConstant(methodParamTypes[i]);
                         switch (this.methodParamTypes[i]){
                             case TypeHints.BYTE:
-                                setLocalInt(frame, curSlot, getContext().getMeta().unboxByte(argument)); break;
+                                setLocalInt(frame, curSlot, ((byte) arguments[i + receiverSlot])); break;
                             case TypeHints.CHAR:
-                                setLocalInt(frame, curSlot, getContext().getMeta().unboxCharacter(argument)); break;
+                                setLocalInt(frame, curSlot, ((char) arguments[i + receiverSlot])); break;
                             case TypeHints.DOUBLE:
-                                setLocalDouble(frame, curSlot, getContext().getMeta().unboxDouble(argument)); break;
+                                setLocalDouble(frame, curSlot, (double) arguments[i + receiverSlot]); break;
                             case TypeHints.FLOAT:
-                                setLocalFloat(frame, curSlot, getContext().getMeta().unboxFloat(argument)); break;
+                                setLocalFloat(frame, curSlot, (float) arguments[i + receiverSlot]); break;
                             case TypeHints.INT:
-                                setLocalInt(frame, curSlot, getContext().getMeta().unboxInteger(argument)); break;
+                                setLocalInt(frame, curSlot, (int) arguments[i + receiverSlot]); break;
                             case TypeHints.LONG:
-                                setLocalLong(frame, curSlot, getContext().getMeta().unboxLong(argument)); break;
+                                setLocalLong(frame, curSlot, (long) arguments[i + receiverSlot]); break;
                             case TypeHints.SHORT:
-                                setLocalInt(frame, curSlot, getContext().getMeta().unboxShort(argument)); break;
+                                setLocalInt(frame, curSlot, ((short) arguments[i + receiverSlot])); break;
                             case TypeHints.BOOLEAN:
-                                setLocalInt(frame, curSlot, getContext().getMeta().unboxBoolean(argument) ? 1 : 0); break;
+                                setLocalInt(frame, curSlot, ((boolean) arguments[i + receiverSlot]) ? 1 : 0); break;
                             default:
+                                StaticObject argument = (StaticObject) arguments[i + receiverSlot];
                                 setLocalObject(frame, curSlot, argument);
                                 checkNoForeignObjectAssumption(argument);
                                 break;
@@ -838,89 +843,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         }
     }
 
-    // boxes the arguments of an invoke if they have generic type
-    @ExplodeLoop(kind = ExplodeLoop.LoopExplosionKind.FULL_UNROLL)
-    private void prepareArgsForInvoke(VirtualFrame frame, int curBCI, int top) {
-        CompilerAsserts.partialEvaluationConstant(isInvoke);
-        CompilerAsserts.partialEvaluationConstant(instOperandTypes[curBCI]);
-        if (isInvoke != null && instOperandTypes[curBCI] != null) {
-            CompilerAsserts.partialEvaluationConstant(isInvoke[curBCI]);
-            if (isInvoke[curBCI]) {
-                // System.out.println("PrepareArgsForInvoke  bci: " + curBCI);
-                for (int i = 0; i < instOperandTypes[curBCI].length; ++i) {
-                    int position = top - (instOperandTypes[curBCI].length - i);
-                    CompilerAsserts.partialEvaluationConstant(instOperandTypes[curBCI][i]);
-                    switch (instOperandTypes[curBCI][i]) {
-                        case TypeHints.BYTE:
-                            putObject(frame, position, getContext().getMeta().boxByte((byte) popInt(frame, position)));
-                            break;
-                        case TypeHints.CHAR:
-                            putObject(frame, position, getContext().getMeta().boxCharacter((char) popInt(frame, position)));
-                            break;
-                        case TypeHints.DOUBLE:
-                            putObject(frame, position, getContext().getMeta().boxDouble(popDouble(frame, position)));
-                            break;
-                        case TypeHints.FLOAT:
-                            putObject(frame, position, getContext().getMeta().boxFloat(popFloat(frame, position)));
-                            break;
-                        case TypeHints.INT:
-                            putObject(frame, position, getContext().getMeta().boxInteger(popInt(frame, position)));
-                            break;
-                        case TypeHints.LONG:
-                            putObject(frame, position, getContext().getMeta().boxLong(popLong(frame, position)));
-                            break;
-                        case TypeHints.SHORT:
-                            putObject(frame, position, getContext().getMeta().boxShort((short) popInt(frame, position)));
-                            break;
-                        case TypeHints.BOOLEAN:
-                            putObject(frame, position, getContext().getMeta().boxBoolean(popInt(frame, position) != 0));
-                            break;
-                        default:
-                    }
-                }
-            }
-        }
-    }
-
-    // unbox the returned object based on the reified type if the return value has generic type
-    private void postInvokeUnboxing(VirtualFrame frame, int curBCI, int top, int curOpcode) {
-        if (isInvoke != null && isInvoke[curBCI] && invokeReturnTypes[curBCI] != 0){
-            assert top >= 1;
-            // System.out.println("postInvokeUnboxing bci: " + curBCI + " opcode: " + Bytecodes.nameOf(curOpcode) + " returnType: " + invokeReturnTypes[curBCI]);
-            // need to add the stack effect of the opcode, then get the top object
-            int returnPosition = top + Bytecodes.stackEffectOf(curOpcode) - 1;
-            StaticObject returnObject = peekObject(frame, returnPosition);
-            CompilerAsserts.partialEvaluationConstant(invokeReturnTypes[curBCI]);
-            switch (invokeReturnTypes[curBCI]){
-                case TypeHints.BYTE:
-                    putInt(frame, returnPosition, getContext().getMeta().unboxInteger(returnObject));
-                    break;
-                case TypeHints.CHAR:
-                    putInt(frame, returnPosition, getContext().getMeta().unboxCharacter(returnObject));
-                    break;
-                case TypeHints.DOUBLE:
-                    putReifiedDouble(frame, returnPosition, getContext().getMeta().unboxDouble(returnObject));
-                    break;
-                case TypeHints.FLOAT:
-                    putFloat(frame, returnPosition, getContext().getMeta().unboxFloat(returnObject));
-                    break;
-                case TypeHints.INT:
-                    putInt(frame, returnPosition, getContext().getMeta().unboxInteger(returnObject));
-                    break;
-                case TypeHints.LONG:
-                    putReifiedLong(frame, returnPosition, getContext().getMeta().unboxLong(returnObject));
-                    break;
-                case TypeHints.SHORT:
-                    putInt(frame, returnPosition, getContext().getMeta().unboxShort(returnObject));
-                    break;
-                case TypeHints.BOOLEAN:
-                    putInt(frame, returnPosition, getContext().getMeta().unboxBoolean(returnObject) ? 1 : 0);
-                    break;
-                default: ;
-            }
-        }
-    }
-
     @SuppressWarnings("DataFlowIssue")   // Too complex for IntelliJ to analyze.
     @ExplodeLoop(kind = ExplodeLoop.LoopExplosionKind.MERGE_EXPLODE)
     @BytecodeInterpreterSwitch
@@ -976,8 +898,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                      */
                     setBCI(frame, curBCI);
                 }
-
-                prepareArgsForInvoke(frame, curBCI, top);
 
                 // @formatter:off
                 switch (curOpcode) {
@@ -1593,7 +1513,11 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     case INVOKESPECIAL: // fall through
                     case INVOKESTATIC:  // fall through
                     case INVOKEINTERFACE:
-                        top += quickenInvoke(frame, top, curBCI, curOpcode, statementIndex);
+                        if (this.ignoreInvoke != null && this.ignoreInvoke[curBCI]) {
+                            top -= Bytecodes.stackEffectOf(curOpcode);
+                        } else {
+                            top += quickenInvoke(frame, top, curBCI, curOpcode, statementIndex);
+                        }
                         break;
                     case NEW         :
                         Klass klass = resolveType(NEW, bs.readCPI2(curBCI));
@@ -1950,7 +1874,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                 throw e.reThrow();
             }
             assert curOpcode != WIDE && curOpcode != LOOKUPSWITCH && curOpcode != TABLESWITCH;
-            postInvokeUnboxing(frame, curBCI, top, curOpcode);
             int targetBCI = curBCI + Bytecodes.lengthOf(curOpcode);
             livenessAnalysis.performOnEdge(frame, curBCI, targetBCI, skipLivenessActions);
             if (instrument != null) {
@@ -2065,14 +1988,14 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     assert instOperandTypes[curBCI].length == 1;
                     CompilerAsserts.partialEvaluationConstant(instOperandTypes[curBCI][0]);
                     switch (instOperandTypes[curBCI][0]) {
-                        case TypeHints.BYTE: return getContext().getMeta().boxByte((byte) popInt(frame, top - 1));
-                        case TypeHints.CHAR: return getContext().getMeta().boxCharacter((char) popInt(frame, top - 1));
-                        case TypeHints.DOUBLE: return getContext().getMeta().boxDouble(popDouble(frame, top - 1));
-                        case TypeHints.FLOAT: return getContext().getMeta().boxFloat(popFloat(frame, top - 1));
-                        case TypeHints.INT: return getContext().getMeta().boxInteger(popInt(frame, top - 1));
-                        case TypeHints.LONG: return getContext().getMeta().boxLong(popLong(frame, top - 1));
-                        case TypeHints.SHORT: return getContext().getMeta().boxShort((short) popInt(frame, top - 1));
-                        case TypeHints.BOOLEAN: return getContext().getMeta().boxBoolean(stackIntToBoolean(popInt(frame, top - 1)));
+                        case TypeHints.BYTE: return (byte) popInt(frame, top - 1);
+                        case TypeHints.CHAR: return (char) popInt(frame, top - 1);
+                        case TypeHints.DOUBLE: return popDouble(frame, top - 1);
+                        case TypeHints.FLOAT: return popFloat(frame, top - 1);
+                        case TypeHints.INT: return popInt(frame, top - 1);
+                        case TypeHints.LONG: return popLong(frame, top - 1);
+                        case TypeHints.SHORT: return (short) popInt(frame, top - 1);
+                        case TypeHints.BOOLEAN: return stackIntToBoolean(popInt(frame, top - 1));
                         default: return popObject(frame, top - 1);
                     }
                 } else {
@@ -2782,12 +2705,21 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             return new InvokeHandleNode(resolved, resolvedInvoke.invoker(), top, curBCI);
         } else {
             // @formatter:off
-            return switch (callKind) {
-                case STATIC          -> new InvokeStaticQuickNode(resolved, top, curBCI);
-                case ITABLE_LOOKUP   -> new InvokeInterfaceQuickNode(resolved, top, curBCI);
-                case VTABLE_LOOKUP   -> new InvokeVirtualQuickNode(resolved, top, curBCI);
-                case DIRECT          -> new InvokeSpecialQuickNode(resolved, top, curBCI);
-            };
+            if (this.instOperandTypes[curBCI] != null) {
+                return switch (callKind) {
+                    case STATIC          -> new InvokeStaticQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI]);
+                    case ITABLE_LOOKUP   -> new InvokeInterfaceQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI]);
+                    case VTABLE_LOOKUP   -> new InvokeVirtualQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI]);
+                    case DIRECT          -> new InvokeSpecialQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI]);
+                };
+            } else {
+                return switch (callKind) {
+                    case STATIC          -> new InvokeStaticQuickNode(resolved, top, curBCI);
+                    case ITABLE_LOOKUP   -> new InvokeInterfaceQuickNode(resolved, top, curBCI);
+                    case VTABLE_LOOKUP   -> new InvokeVirtualQuickNode(resolved, top, curBCI);
+                    case DIRECT          -> new InvokeSpecialQuickNode(resolved, top, curBCI);
+                };
+            }
             // @formatter:on
         }
     }

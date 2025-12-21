@@ -22,6 +22,7 @@
  */
 package com.oracle.truffle.espresso.nodes.quick.invoke;
 
+import com.oracle.truffle.api.CompilerDirectives.CompilationFinal;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.espresso.classfile.attributes.reified.MethodTypeParameterCountAttribute;
 import com.oracle.truffle.espresso.classfile.descriptors.SignatureSymbols;
@@ -38,6 +39,7 @@ public abstract class InvokeQuickNode extends QuickNode {
     // Helper information for easier arguments handling.
     protected final int resultAt;
     protected final int stackEffect;
+    @CompilationFinal(dimensions = 1) protected final byte[] argsType;
 
     // Helps check for no foreign objects
     private final boolean returnsPrimitive;
@@ -48,6 +50,7 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.resultAt = top -(SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.returnsPrimitive = m.getReturnKind().isPrimitive();
+        this.argsType = null;
     }
 
     public InvokeQuickNode(Method.MethodVersion version, int top, int callerBCI) {
@@ -57,6 +60,26 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.resultAt = top - (SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.returnsPrimitive = m.getReturnKind().isPrimitive();
+        this.argsType = null;
+    }
+
+    public InvokeQuickNode(Method m, int top, int callerBCI, byte[] argsType) {
+        super(top, callerBCI);
+        this.method = m.getMethodVersion();
+        this.resultAt = top -(SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
+        this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
+        this.returnsPrimitive = m.getReturnKind().isPrimitive();
+        this.argsType = argsType;
+    }
+
+    public InvokeQuickNode(Method.MethodVersion version, int top, int callerBCI, byte[] argsType) {
+        super(top, callerBCI);
+        this.method = version;
+        Method m = version.getMethod();
+        this.resultAt = top - (SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
+        this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
+        this.returnsPrimitive = m.getReturnKind().isPrimitive();
+        this.argsType = argsType;
     }
 
     public final StaticObject peekReceiver(VirtualFrame frame) {
@@ -77,8 +100,11 @@ public abstract class InvokeQuickNode extends QuickNode {
             // Don't create an array for empty arguments.
             return EMPTY_ARGS;
         }
-        Object[] res = EspressoFrame.popArguments(frame, top, !method.isStatic(), method.getMethod().getParsedSignature());
-        return res;
+        if (this.argsType == null) {
+            return EspressoFrame.popArguments(frame, top, !method.isStatic(), method.getMethod().getParsedSignature());
+        } else {
+            return EspressoFrame.popArguments(frame, top, !method.isStatic(), method.getMethod().getParsedSignature(), this.argsType);
+        }
     }
 
     public final int pushResult(VirtualFrame frame, int result) {

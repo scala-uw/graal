@@ -1,6 +1,8 @@
 package com.oracle.truffle.espresso.classfile.attributes.reified;
 
+import java.util.AbstractSet;
 import java.util.Arrays;
+import java.util.HashSet;
 
 import com.oracle.truffle.espresso.classfile.attributes.Attribute;
 import com.oracle.truffle.espresso.classfile.descriptors.Name;
@@ -11,21 +13,24 @@ public class ExtraBoxUnboxAttribute extends Attribute {
 
     public static final Symbol<Name> NAME = ParserNames.ExtraBoxUnbox;
 
-    private final int[] bcOffsets;
+    private final AbstractSet<Integer> bcOffsets;
 
     public ExtraBoxUnboxAttribute(Symbol<Name> name, int[] bcOffsets) {
         super(name, null);
-        this.bcOffsets = bcOffsets;
+        this.bcOffsets = new HashSet<>();
+        for (int v : bcOffsets) {
+            this.bcOffsets.add(v);
+        }
     }
 
-    public int[] getBCOffsets() {
-        return bcOffsets;
+    public AbstractSet<Integer> getBCOffsets() {
+        return this.bcOffsets;
     }
 
     @Override
     public String toString() {
         return "InstructionTypeArgumentsAttribute{" +
-                        "entries=" + Arrays.toString(bcOffsets) +
+                        "entries=" + this.bcOffsets.toString() +
                         '}';
     }
 

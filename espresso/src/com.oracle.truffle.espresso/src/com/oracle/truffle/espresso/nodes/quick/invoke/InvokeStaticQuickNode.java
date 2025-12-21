@@ -43,6 +43,14 @@ public final class InvokeStaticQuickNode extends InvokeQuickNode {
         this.invokeStatic = insert(InvokeStaticNodeGen.create(method));
     }
 
+    public InvokeStaticQuickNode(Method method, int top, int curBCI, byte[] argsType) {
+        super(method, top, curBCI, argsType);
+        assert method.isStatic();
+        this.isDoPrivilegedCall = method.getMeta().java_security_AccessController.equals(method.getDeclaringKlass()) &&
+                        Names.doPrivileged.equals(method.getName());
+        this.invokeStatic = insert(InvokeStaticNodeGen.create(method));
+    }
+
     @Override
     public int execute(VirtualFrame frame, boolean isContinuationResume) {
         // Support for AccessController.doPrivileged.

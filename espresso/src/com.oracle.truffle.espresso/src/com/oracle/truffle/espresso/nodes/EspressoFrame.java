@@ -30,6 +30,7 @@ import com.oracle.truffle.api.frame.FrameSlotKind;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.espresso.classfile.JavaKind;
+import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 import com.oracle.truffle.espresso.classfile.descriptors.SignatureSymbols;
 import com.oracle.truffle.espresso.classfile.descriptors.Symbol;
 import com.oracle.truffle.espresso.classfile.descriptors.Type;
@@ -389,6 +390,75 @@ public final class EspressoFrame {
                 case '[' : // fall through
                 case 'L' : 
                     args[i + extraParam] = popObject(frame, argAt); break;
+                default  :
+                    CompilerDirectives.transferToInterpreterAndInvalidate();
+                    throw EspressoError.shouldNotReachHere();
+            }
+            // @formatter:on
+            --argAt;
+
+        }
+        if (hasReceiver) {
+            args[0] = popObject(frame, argAt);
+        }
+        return args;
+    }
+
+    @ExplodeLoop
+    public static Object[] popArguments(VirtualFrame frame, int top, boolean hasReceiver, final Symbol<Type>[] signature, byte[] argsType) {
+        int argCount = SignatureSymbols.parameterCount(signature);
+        int extraParam = hasReceiver ? 1 : 0;
+        final Object[] args = new Object[argCount + extraParam];
+
+        CompilerAsserts.partialEvaluationConstant(argCount);
+        CompilerAsserts.partialEvaluationConstant(signature);
+        CompilerAsserts.partialEvaluationConstant(hasReceiver);
+        
+        int argAt = top - 1;
+        for (int i = argCount - 1; i >= 0; --i) {
+            Symbol<Type> argType = SignatureSymbols.parameterType(signature, i);
+            // @formatter:off
+            switch (argType.byteAt(0)) {
+                case 'Z' : args[i + extraParam] = (popInt(frame, argAt) != 0);  break;
+                case 'B' : args[i + extraParam] = (byte) popInt(frame, argAt);  break;
+                case 'S' : args[i + extraParam] = (short) popInt(frame, argAt); break;
+                case 'C' : args[i + extraParam] = (char) popInt(frame, argAt);  break;
+                case 'I' : args[i + extraParam] = popInt(frame, argAt);         break;
+                case 'F' : args[i + extraParam] = popFloat(frame, argAt);       break;
+                case 'J' : args[i + extraParam] = popLong(frame, argAt);   --argAt; break;
+                case 'D' : args[i + extraParam] = popDouble(frame, argAt); --argAt; break;
+                case '[' : // fall through
+                case 'L' :
+                    switch (argsType[i]) {
+                        case TypeHints.BYTE:
+                            args[i + extraParam] = (byte) popInt(frame, top - 1);
+                            break;
+                        case TypeHints.CHAR:
+                            args[i + extraParam] = (char) popInt(frame, top - 1);
+                            break;
+                        case TypeHints.DOUBLE:
+                            args[i + extraParam] = popDouble(frame, top - 1);
+                            break;
+                        case TypeHints.FLOAT:
+                            args[i + extraParam] = popFloat(frame, top - 1);
+                            break;
+                        case TypeHints.INT:
+                            args[i + extraParam] = popInt(frame, top - 1);
+                            break;
+                        case TypeHints.LONG:
+                            args[i + extraParam] = popLong(frame, top - 1);
+                            break;
+                        case TypeHints.SHORT:
+                            args[i + extraParam] = (short) popInt(frame, top - 1);
+                            break;
+                        case TypeHints.BOOLEAN:
+                            args[i + extraParam] = (popInt(frame, top - 1) != 0);
+                            break;
+                        default:
+                            args[i + extraParam] = popObject(frame, argAt);
+                            break;
+                    }
+                    break;
                 default  :
                     CompilerDirectives.transferToInterpreterAndInvalidate();
                     throw EspressoError.shouldNotReachHere();
