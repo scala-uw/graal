@@ -40,6 +40,7 @@ public abstract class InvokeQuickNode extends QuickNode {
     protected final int resultAt;
     protected final int stackEffect;
     @CompilationFinal(dimensions = 1) protected final byte[] argsType;
+    @CompilationFinal protected final byte returnType;
 
     // Helps check for no foreign objects
     private final boolean returnsPrimitive;
@@ -51,6 +52,7 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.returnsPrimitive = m.getReturnKind().isPrimitive();
         this.argsType = null;
+        this.returnType = 0;
     }
 
     public InvokeQuickNode(Method.MethodVersion version, int top, int callerBCI) {
@@ -61,18 +63,20 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.returnsPrimitive = m.getReturnKind().isPrimitive();
         this.argsType = null;
+        this.returnType = 0;
     }
 
-    public InvokeQuickNode(Method m, int top, int callerBCI, byte[] argsType) {
+    public InvokeQuickNode(Method m, int top, int callerBCI, byte[] argsType, byte returnType) {
         super(top, callerBCI);
         this.method = m.getMethodVersion();
         this.resultAt = top -(SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.returnsPrimitive = m.getReturnKind().isPrimitive();
         this.argsType = argsType;
+        this.returnType = returnType;
     }
 
-    public InvokeQuickNode(Method.MethodVersion version, int top, int callerBCI, byte[] argsType) {
+    public InvokeQuickNode(Method.MethodVersion version, int top, int callerBCI, byte[] argsType, byte returnType) {
         super(top, callerBCI);
         this.method = version;
         Method m = version.getMethod();
@@ -80,6 +84,7 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.returnsPrimitive = m.getReturnKind().isPrimitive();
         this.argsType = argsType;
+        this.returnType = returnType;
     }
 
     public final StaticObject peekReceiver(VirtualFrame frame) {

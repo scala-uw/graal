@@ -2707,10 +2707,10 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             // @formatter:off
             if (this.instOperandTypes[curBCI] != null) {
                 return switch (callKind) {
-                    case STATIC          -> new InvokeStaticQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI]);
-                    case ITABLE_LOOKUP   -> new InvokeInterfaceQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI]);
-                    case VTABLE_LOOKUP   -> new InvokeVirtualQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI]);
-                    case DIRECT          -> new InvokeSpecialQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI]);
+                    case STATIC          -> new InvokeStaticQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI], this.invokeReturnTypes[curBCI]);
+                    case ITABLE_LOOKUP   -> new InvokeInterfaceQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI], this.invokeReturnTypes[curBCI]);
+                    case VTABLE_LOOKUP   -> new InvokeVirtualQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI], this.invokeReturnTypes[curBCI]);
+                    case DIRECT          -> new InvokeSpecialQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI], this.invokeReturnTypes[curBCI]);
                 };
             } else {
                 return switch (callKind) {

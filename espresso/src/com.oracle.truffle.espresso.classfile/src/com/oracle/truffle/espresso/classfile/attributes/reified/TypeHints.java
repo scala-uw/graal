@@ -17,6 +17,7 @@ public class TypeHints {
     public static final byte CLASS_TYPE_PARAM = 'K';
     public static final byte METHOD_TYPE_PARAM = 'M';
 
+    public static final byte[] LIST_PRIMITIVES = new byte[]{BYTE, CHAR, DOUBLE, FLOAT, INT, LONG, SHORT, BOOLEAN};
     public static final byte[] LIST_AVAILABLE = new byte[]{BYTE, CHAR, DOUBLE, FLOAT, INT, LONG, SHORT, BOOLEAN, REFERENCE};
 
     public static class TypeB {
@@ -32,8 +33,6 @@ public class TypeHints {
         private final int index;
 
         public TypeB(byte kind, int index) {
-            assert kind == CLASS_TYPE_PARAM || kind == METHOD_TYPE_PARAM || 
-                   kind == ARR_CLASS_TYPE_PARAM || kind == ARR_METHOD_TYPE_PARAM;
             this.kind = kind;
             this.index = index;
         }
@@ -48,6 +47,11 @@ public class TypeHints {
             } else if (this.kind == CLASS_TYPE_PARAM) {
                 return TypeHints.REFERENCE; // TODO: class type params
             } else {
+                for (byte primitiveChar : LIST_PRIMITIVES) {
+                    if (this.kind == primitiveChar) {
+                        return primitiveChar;
+                    }
+                }
                 return TypeHints.REFERENCE;
             }
         }

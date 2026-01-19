@@ -277,13 +277,23 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                         state.stackTop -= 4;
                         break;
                     }
-                    if (ignoredCalls.contains(bci)) {
-                        this.resAtBCI[bci] = new TypeAnalysisResult(new TypeHints.TypeB[0], true, true);
-                        break;
-                    }
                     
                     Symbol<Type>[] signature = resolvedMethod.getParsedSignature();
                     int paramCnt = SignatureSymbols.parameterCount(signature);
+
+
+                    if (ignoredCalls.contains(bci)) {
+                        assert resolvedMethod.isStatic() && paramCnt == 1;
+                        Symbol<Type> inputType = SignatureSymbols.parameterType(signature, 0);
+                        for (byte primitiveChar : TypeHints.LIST_PRIMITIVES) {
+                            if (inputType.byteAt(0) == primitiveChar) {
+                                state.stack[state.stackTop - 1] = new TypeHints.TypeB(primitiveChar, -1);
+                            }
+                        } 
+                        this.resAtBCI[bci] = new TypeAnalysisResult(new TypeHints.TypeB[0], true, true);
+                        break;
+                    }
+
                     TypeHints.TypeB[] argsHint = new TypeHints.TypeB[paramCnt];
                     for (int i = paramCnt - 1; i >= 0; i--){
                         Symbol<Type> cur = SignatureSymbols.parameterType(signature, i);
