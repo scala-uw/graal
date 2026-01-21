@@ -285,9 +285,16 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     if (ignoredCalls.contains(bci)) {
                         assert resolvedMethod.isStatic() && paramCnt == 1;
                         Symbol<Type> inputType = SignatureSymbols.parameterType(signature, 0);
+                        Symbol<Type> returnType = SignatureSymbols.returnType(signature);
                         for (byte primitiveChar : TypeHints.LIST_PRIMITIVES) {
                             if (inputType.byteAt(0) == primitiveChar) {
                                 state.stack[state.stackTop - 1] = new TypeHints.TypeB(primitiveChar, -1);
+                                break;
+                            }
+                            if (returnType.byteAt(0) == primitiveChar) {
+                                assert state.stack[state.stackTop - 1].getKind() == primitiveChar;
+                                state.stack[state.stackTop - 1] = null; // Its type in bytecode is no longer a reference
+                                break;
                             }
                         } 
                         this.resAtBCI[bci] = new TypeAnalysisResult(new TypeHints.TypeB[0], true, true);

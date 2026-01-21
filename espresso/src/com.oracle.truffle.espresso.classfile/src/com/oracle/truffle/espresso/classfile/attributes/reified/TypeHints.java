@@ -16,17 +16,39 @@ public class TypeHints {
     public static final byte REFERENCE = 'L';
     public static final byte CLASS_TYPE_PARAM = 'K';
     public static final byte METHOD_TYPE_PARAM = 'M';
+    public static final byte ARR_CLASS_TYPE_PARAM = 'k';
+    public static final byte ARR_METHOD_TYPE_PARAM = 'm';
+    public static final byte EMPTY_KIND = 0; // only for annotation format, not valid for the `kind` field in memory
 
     public static final byte[] LIST_PRIMITIVES = new byte[]{BYTE, CHAR, DOUBLE, FLOAT, INT, LONG, SHORT, BOOLEAN};
     public static final byte[] LIST_AVAILABLE = new byte[]{BYTE, CHAR, DOUBLE, FLOAT, INT, LONG, SHORT, BOOLEAN, REFERENCE};
 
-    public static class TypeB {
-        public static final byte EMPTY_KIND = 0;
-        public static final byte CLASS_TYPE_PARAM = 'K';
-        public static final byte METHOD_TYPE_PARAM = 'M';
-        public static final byte ARR_CLASS_TYPE_PARAM = 'k';
-        public static final byte ARR_METHOD_TYPE_PARAM = 'm';
+    public static boolean isPrimitive(byte hint) {
+        for (byte p : LIST_PRIMITIVES) {
+            if (p == hint) {
+                return true;
+            }
+        }
+        return false;
+    }
 
+    public static JavaKind toJavaKind(byte hint) {
+        switch (hint) {
+            case BYTE: return JavaKind.Byte;
+            case CHAR: return JavaKind.Char;
+            case DOUBLE: return JavaKind.Double;
+            case FLOAT: return JavaKind.Float;
+            case INT: return JavaKind.Int;
+            case LONG: return JavaKind.Long;
+            case SHORT: return JavaKind.Short;
+            case BOOLEAN: return JavaKind.Boolean;
+            default:
+                assert hint == REFERENCE;
+                return JavaKind.Object;
+        }
+    }
+
+    public static class TypeB {
         @CompilerDirectives.CompilationFinal
         private final byte kind;
         @CompilerDirectives.CompilationFinal
@@ -47,10 +69,8 @@ public class TypeHints {
             } else if (this.kind == CLASS_TYPE_PARAM) {
                 return TypeHints.REFERENCE; // TODO: class type params
             } else {
-                for (byte primitiveChar : LIST_PRIMITIVES) {
-                    if (this.kind == primitiveChar) {
-                        return primitiveChar;
-                    }
+                if (isPrimitive(this.kind)) {
+                    return this.kind;
                 }
                 return TypeHints.REFERENCE;
             }
