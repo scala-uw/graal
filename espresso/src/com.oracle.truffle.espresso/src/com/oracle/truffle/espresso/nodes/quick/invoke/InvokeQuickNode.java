@@ -31,6 +31,7 @@ import com.oracle.truffle.espresso.impl.Method;
 import com.oracle.truffle.espresso.nodes.EspressoFrame;
 import com.oracle.truffle.espresso.nodes.quick.QuickNode;
 import com.oracle.truffle.espresso.runtime.staticobject.StaticObject;
+import com.oracle.truffle.espresso.classfile.attributes.reified.TypeHints;
 
 public abstract class InvokeQuickNode extends QuickNode {
     private static final Object[] EMPTY_ARGS = new Object[0];
@@ -63,7 +64,7 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.resultAt = top - (SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.argsType = null;
-        this.returnKind = m.getMethod().getReturnKind();
+        this.returnKind = m.getReturnKind();
         this.returnsPrimitive = this.returnKind.isPrimitive();
     }
 
@@ -93,7 +94,7 @@ public abstract class InvokeQuickNode extends QuickNode {
             assert m.getReturnKind() == JavaKind.Object;
             this.returnKind = TypeHints.toJavaKind(returnType);
         } else {
-            this.returnKind = m.getMethod().getReturnKind();
+            this.returnKind = m.getReturnKind();
         }
         this.returnsPrimitive = this.returnKind.isPrimitive();
     }
@@ -155,7 +156,7 @@ public abstract class InvokeQuickNode extends QuickNode {
         }
         EspressoFrame.putKind(frame, resultAt, result, this.returnKind);
         return stackEffect;
-        // if (!reifiedEnabled || returnTypeHint.isNoHint() || returnTypeHint.getKind() == TypeHints.TypeB.REFERENCE){
+        // if (!reifiedEnabled || returnTypeHint.isNoHint() || returnTypeHint.getKind() == TypeHints.REFERENCE){
         //     if (!returnsPrimitive) {
         //         getBytecodeNode().checkNoForeignObjectAssumption((StaticObject) result);
         //     }
@@ -171,11 +172,11 @@ public abstract class InvokeQuickNode extends QuickNode {
         //     byte kind = returnTypeHint.getKind();
         //     int index = returnTypeHint.getIndex();
         //     byte reifiedValue = -1;
-        //     if (kind == TypeHints.TypeB.METHOD_TYPE_PARAM){
+        //     if (kind == TypeHints.METHOD_TYPE_PARAM){
         //         reifiedValue = (byte) args[
         //             method.getMethod().getParameterCount() + (method.isStatic() ? 0 : 1)
         //             + index]; //TODO, check this
-        //     } else if (kind == TypeHints.TypeB.CLASS_TYPE_PARAM){
+        //     } else if (kind == TypeHints.CLASS_TYPE_PARAM){
         //         //TODO
         //     } else {
         //         throw EspressoError.shouldNotReachHere("Unexpected type kind: " + kind + " in pushResult of inoke" + toString());

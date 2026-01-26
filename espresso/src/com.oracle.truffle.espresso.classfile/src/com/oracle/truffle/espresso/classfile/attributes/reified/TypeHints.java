@@ -3,6 +3,7 @@ package com.oracle.truffle.espresso.classfile.attributes.reified;
 import java.util.Objects;
 
 import com.oracle.truffle.api.CompilerDirectives;
+import com.oracle.truffle.espresso.classfile.JavaKind;
 
 public class TypeHints {
     public static final byte BYTE = 'B';

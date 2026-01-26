@@ -38,8 +38,8 @@ public final class InvokeInterfaceQuickNode extends InvokeQuickNode {
         this.invokeInterface = insert(InvokeInterfaceNodeGen.WithoutNullCheckNodeGen.create(method));
     }
 
-    public InvokeInterfaceQuickNode(Method method, int top, int curBCI, byte[] argsType) {
-        super(method, top, curBCI, argsType);
+    public InvokeInterfaceQuickNode(Method method, int top, int curBCI, byte[] argsType, byte returnType) {
+        super(method, top, curBCI, argsType, returnType);
         assert !method.isStatic();
         this.invokeInterface = insert(InvokeInterfaceNodeGen.WithoutNullCheckNodeGen.create(method));
     }

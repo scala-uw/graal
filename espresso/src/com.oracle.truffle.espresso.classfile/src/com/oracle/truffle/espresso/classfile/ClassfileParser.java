@@ -1401,7 +1401,7 @@ public final class ClassfileParser {
         for (int i = 0; i < parameterCount; i++) {
             byte kind = (byte) stream.readU1();
             int index = stream.readU2();
-            if (kind != TypeHints.TypeB.EMPTY_KIND) {
+            if (kind != TypeHints.EMPTY_KIND) {
                 paramTypes[i] = new TypeHints.TypeB(kind, index);
             } // else remain null
         }
@@ -1429,7 +1429,7 @@ public final class ClassfileParser {
             byte kind = (byte) stream.readU1();
             int index = stream.readU2();
             entries[i] = new InvokeReturnTypeAttribute.Entry(
-                bcOffset, kind != TypeHints.TypeB.EMPTY_KIND ? new TypeHints.TypeB(kind, index) : null);
+                bcOffset, kind != TypeHints.EMPTY_KIND ? new TypeHints.TypeB(kind, index) : null);
         }
         return new InvokeReturnTypeAttribute(name, entries);
     }
@@ -1456,7 +1456,7 @@ public final class ClassfileParser {
         assert ParserNames.FieldType.equals(name);
         byte kind = (byte) stream.readU1();
         int index = stream.readU2();
-        return new FieldTypeAttribute(name, kind != TypeHints.TypeB.EMPTY_KIND ? new TypeHints.TypeB(kind, index) : null);
+        return new FieldTypeAttribute(name, kind != TypeHints.EMPTY_KIND ? new TypeHints.TypeB(kind, index) : null);
     }
 
     private LineNumberTableAttribute parseLineNumberTable(Symbol<Name> name) {

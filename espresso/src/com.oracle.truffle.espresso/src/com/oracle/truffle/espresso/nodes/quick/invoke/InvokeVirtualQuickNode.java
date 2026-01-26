@@ -38,8 +38,8 @@ public final class InvokeVirtualQuickNode extends InvokeQuickNode {
         this.invokeVirtual = insert(InvokeVirtualNodeGen.WithoutNullCheckNodeGen.create(method));
     }
 
-    public InvokeVirtualQuickNode(Method method, int top, int curBCI, byte[] argsType) {
-        super(method, top, curBCI, argsType);
+    public InvokeVirtualQuickNode(Method method, int top, int curBCI, byte[] argsType, byte returnType) {
+        super(method, top, curBCI, argsType, returnType);
         assert !method.isStatic();
         this.invokeVirtual = insert(InvokeVirtualNodeGen.WithoutNullCheckNodeGen.create(method));
     }

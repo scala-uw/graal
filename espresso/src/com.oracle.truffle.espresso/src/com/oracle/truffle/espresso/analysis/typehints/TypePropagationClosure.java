@@ -254,12 +254,12 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     if (resolvedMethod.getNameAsString().equals("array_apply") && resolvedMethod.getDeclaringKlass().getNameAsString().equals("scala/runtime/ScalaRunTime$")) {
                         TypeHints.TypeB xs_type = state.stack[state.stackTop - 2];
                         byte xs_type_kind = xs_type.getKind();
-                        assert xs_type_kind == TypeHints.TypeB.ARR_CLASS_TYPE_PARAM
-                            || xs_type_kind == TypeHints.TypeB.ARR_METHOD_TYPE_PARAM;
-                        if (xs_type_kind == TypeHints.TypeB.ARR_CLASS_TYPE_PARAM) {
-                            state.stack[state.stackTop - 3] = new TypeHints.TypeB(TypeHints.TypeB.CLASS_TYPE_PARAM, xs_type.getIndex());
+                        assert xs_type_kind == TypeHints.ARR_CLASS_TYPE_PARAM
+                            || xs_type_kind == TypeHints.ARR_METHOD_TYPE_PARAM;
+                        if (xs_type_kind == TypeHints.ARR_CLASS_TYPE_PARAM) {
+                            state.stack[state.stackTop - 3] = new TypeHints.TypeB(TypeHints.CLASS_TYPE_PARAM, xs_type.getIndex());
                         } else { // ARR_METHOD_TYPE_PARAM
-                            state.stack[state.stackTop - 3] = new TypeHints.TypeB(TypeHints.TypeB.METHOD_TYPE_PARAM, xs_type.getIndex());
+                            state.stack[state.stackTop - 3] = new TypeHints.TypeB(TypeHints.METHOD_TYPE_PARAM, xs_type.getIndex());
                         }
                         TypeHints.TypeB[] argsHint = new TypeHints.TypeB[2];
                         assert state.stack[state.stackTop - 1] == null;
