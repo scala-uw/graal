@@ -486,8 +486,6 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     @CompilationFinal(dimensions = 2)
     private final byte[][] instOperandArrayElementTypes;
     @CompilationFinal(dimensions = 1)
-    private final boolean[] isInvoke;
-    @CompilationFinal(dimensions = 1)
     private final boolean[] ignoreInvoke;
 
     @CompilerDirectives.CompilationFinal
@@ -506,12 +504,15 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         this.bs = new BytecodeStream(code);
         this.stackOverflowErrorInfo = method.getSOEHandlerInfo();
 
+        Symbol<Type>[] methodSignature = method.getParsedSignature();
+        int argCount = SignatureSymbols.parameterCount(methodSignature);
         MethodParameterTypeAttribute methodParameterTypeAttribute = methodVersion.getMethod().getMethodParameterTypeAttribute();
-        this.methodParamTypes = new byte[SignatureSymbols.parameterCount(method.getParsedSignature())];
+        this.methodParamTypes = new byte[argCount];
         if (methodParameterTypeAttribute != null){
             TypeHints.TypeB[] methodParameterTypeHints = methodParameterTypeAttribute.getParameterTypes();
             for (int i = 0; i < methodParameterTypeHints.length; ++i) {
-                if (methodParameterTypeHints[i] != null) {
+                Symbol<Type> curSigType = SignatureSymbols.parameterType(methodSignature, i);
+                if (curSigType.byteAt(0) == 'L' && methodParameterTypeHints[i] != null) {
                     this.methodParamTypes[i] = methodParameterTypeHints[i].resolve(reifiedMethodTypeParams);
                 } else {
                     this.methodParamTypes[i] = 0;
@@ -521,26 +522,18 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             for (int i = 0; i < methodParamTypes.length; ++i) methodParamTypes[i] = 0;
         }
 
-        this.invokeReturnTypes = new byte[this.bs.endBCI()];
-        for (int i = 0; i < invokeReturnTypes.length; ++i) invokeReturnTypes[i] = 0;
-        InvokeReturnTypeAttribute invokeReturnTypeAttr = methodVersion.getMethod().getInvokeReturnTypeAttribute();
-        if (invokeReturnTypeAttr != null) {
-            for (InvokeReturnTypeAttribute.Entry entry : invokeReturnTypeAttr.getEntries()) {
-                TypeHints.TypeB curReturnTypeHint = entry.returnType();
-                if (curReturnTypeHint != null) {
-                    invokeReturnTypes[entry.bytecodeOffset()] = curReturnTypeHint.resolve(reifiedMethodTypeParams);
-                }
-            }
-        }
-
         this.instOperandTypes = new byte[this.bs.endBCI()][];
         this.instOperandArrayElementTypes = new byte[this.bs.endBCI()][];
+        this.invokeReturnTypes = new byte[this.bs.endBCI()];
+        this.ignoreInvoke = new boolean[this.bs.endBCI()];
+        for (int i = 0; i < this.bs.endBCI(); ++i) {
+            this.invokeReturnTypes[i] = 0;
+            this.ignoreInvoke[i] = false;
+        }
         if (instOperandTypeHints != null) {
-            this.isInvoke = new boolean[instOperandTypeHints.length];
-            this.ignoreInvoke = new boolean[instOperandTypeHints.length];
             for (int i = 0; i < instOperandTypeHints.length; ++i) {
                 if (instOperandTypeHints[i] != null) {
-                    this.isInvoke[i] = instOperandTypeHints[i].isInvoke;
+                    this.invokeReturnTypes[i] = (instOperandTypeHints[i].invokeReturnType != null) ? instOperandTypeHints[i].invokeReturnType.resolve(reifiedMethodTypeParams) : 0;
                     this.ignoreInvoke[i] = instOperandTypeHints[i].ignoreInvoke;
                     int len = instOperandTypeHints[i].operands.length;
                     instOperandTypes[i] = new byte[len];
@@ -558,14 +551,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                             instOperandArrayElementTypes[i][j] = 0;
                         }
                     }
-                } else {
-                    this.isInvoke[i] = false;
-                    this.ignoreInvoke[i] = false;
                 }
             }
-        } else {
-            this.isInvoke = null;
-            this.ignoreInvoke = null;
         }
 
         this.frameDescriptor = calcFrameDescriptor(methodVersion);

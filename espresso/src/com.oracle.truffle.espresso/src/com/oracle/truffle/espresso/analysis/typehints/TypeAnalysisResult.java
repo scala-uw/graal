@@ -7,18 +7,22 @@ public class TypeAnalysisResult {
     @CompilerDirectives.CompilationFinal(dimensions = 1)
     public final TypeHints.TypeB[] operands;
     @CompilerDirectives.CompilationFinal
+    public final TypeHints.TypeB invokeReturnType;
+    @CompilerDirectives.CompilationFinal
     public final boolean isInvoke;
     @CompilerDirectives.CompilationFinal
     public final boolean ignoreInvoke;
 
     TypeAnalysisResult(TypeHints.TypeB[] content) {
         this.operands = content;
+        this.invokeReturnType = null;
         this.isInvoke = false;
         this.ignoreInvoke = false;
     }
 
-    public TypeAnalysisResult(TypeHints.TypeB[] content, boolean isInvoke, boolean ignoreInvoke) {
+    public TypeAnalysisResult(TypeHints.TypeB[] content, TypeHints.TypeB invokeReturnType, boolean isInvoke, boolean ignoreInvoke) {
         this.operands = content;
+        this.invokeReturnType = invokeReturnType;
         this.isInvoke = isInvoke;
         this.ignoreInvoke = ignoreInvoke;
     }

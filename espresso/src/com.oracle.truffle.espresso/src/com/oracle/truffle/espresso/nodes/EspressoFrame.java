@@ -431,28 +431,28 @@ public final class EspressoFrame {
                 case 'L' :
                     switch (argsType[i]) {
                         case TypeHints.BYTE:
-                            args[i + extraParam] = (byte) popInt(frame, top - 1);
+                            args[i + extraParam] = (byte) popInt(frame, argAt);
                             break;
                         case TypeHints.CHAR:
-                            args[i + extraParam] = (char) popInt(frame, top - 1);
+                            args[i + extraParam] = (char) popInt(frame, argAt);
                             break;
                         case TypeHints.DOUBLE:
-                            args[i + extraParam] = popDouble(frame, top - 1);
+                            args[i + extraParam] = popDouble(frame, argAt);
                             break;
                         case TypeHints.FLOAT:
-                            args[i + extraParam] = popFloat(frame, top - 1);
+                            args[i + extraParam] = popFloat(frame, argAt);
                             break;
                         case TypeHints.INT:
-                            args[i + extraParam] = popInt(frame, top - 1);
+                            args[i + extraParam] = popInt(frame, argAt);
                             break;
                         case TypeHints.LONG:
-                            args[i + extraParam] = popLong(frame, top - 1);
+                            args[i + extraParam] = popLong(frame, argAt);
                             break;
                         case TypeHints.SHORT:
-                            args[i + extraParam] = (short) popInt(frame, top - 1);
+                            args[i + extraParam] = (short) popInt(frame, argAt);
                             break;
                         case TypeHints.BOOLEAN:
-                            args[i + extraParam] = (popInt(frame, top - 1) != 0);
+                            args[i + extraParam] = (popInt(frame, argAt) != 0);
                             break;
                         default:
                             args[i + extraParam] = popObject(frame, argAt);

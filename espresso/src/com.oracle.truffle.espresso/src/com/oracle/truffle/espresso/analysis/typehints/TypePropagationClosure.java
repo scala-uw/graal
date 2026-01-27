@@ -124,9 +124,11 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                         assert methodParameterTypes[i] == null;
                         rootState.locals[localIndex] = null;
                         localIndex++;
-                    } else {
+                    } else if (cur.byteAt(0) == 'L') {
                         rootState.locals[localIndex] = methodParameterTypes[i];
                         if (methodParameterTypes[i] != null) nonTrivial = true;
+                    } else {
+                        rootState.locals[localIndex] = null;
                     }
                     localIndex++;
                 }
@@ -264,7 +266,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                         TypeHints.TypeB[] argsHint = new TypeHints.TypeB[2];
                         assert state.stack[state.stackTop - 1] == null;
                         argsHint[0] = xs_type;
-                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, false, false);
+                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, null, false, false);
                         state.stackTop -= 2;
                         break;
                     }
@@ -273,7 +275,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                         argsHint[0] = state.stack[state.stackTop - 3];
                         assert state.stack[state.stackTop - 2] == null;
                         argsHint[2] = state.stack[state.stackTop - 1];
-                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, false, false);
+                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, null, false, false);
                         state.stackTop -= 4;
                         break;
                     }
@@ -282,22 +284,18 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     int paramCnt = SignatureSymbols.parameterCount(signature);
 
 
+                    Symbol<Type> returnTypeSig = SignatureSymbols.returnType(signature);
                     if (ignoredCalls.contains(bci)) {
                         assert resolvedMethod.isStatic() && paramCnt == 1;
-                        Symbol<Type> inputType = SignatureSymbols.parameterType(signature, 0);
-                        Symbol<Type> returnType = SignatureSymbols.returnType(signature);
-                        for (byte primitiveChar : TypeHints.LIST_PRIMITIVES) {
-                            if (inputType.byteAt(0) == primitiveChar) {
-                                state.stack[state.stackTop - 1] = new TypeHints.TypeB(primitiveChar, -1);
-                                break;
-                            }
-                            if (returnType.byteAt(0) == primitiveChar) {
-                                assert state.stack[state.stackTop - 1].getKind() == primitiveChar;
-                                state.stack[state.stackTop - 1] = null; // Its type in bytecode is no longer a reference
-                                break;
-                            }
-                        } 
-                        this.resAtBCI[bci] = new TypeAnalysisResult(new TypeHints.TypeB[0], true, true);
+                        Symbol<Type> inputTypeSig = SignatureSymbols.parameterType(signature, 0);
+                        if (TypeHints.isPrimitive(inputTypeSig.byteAt(0))) {
+                            state.stack[state.stackTop - 1] = new TypeHints.TypeB(inputTypeSig.byteAt(0), -1);
+                        } else if (TypeHints.isPrimitive(returnTypeSig.byteAt(0))) {
+                            assert state.stack[state.stackTop - 1].getKind() == returnTypeSig.byteAt(0);
+                            state.stack[state.stackTop - 1] = null; // Its type in bytecode is no longer a reference
+                        }
+                        nonTrivial = true;
+                        this.resAtBCI[bci] = new TypeAnalysisResult(new TypeHints.TypeB[0], null, true, true);
                         break;
                     }
 
@@ -312,7 +310,6 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                             argsHint[i] = state.stack[--state.stackTop];
                         }
                     }
-                    this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, true, false); // TODO: ignore some calls here
                     if (!resolvedMethod.isStatic()) {
                         assert state.stack[state.stackTop - 1] == null; // We should ban calling methods of Any (e.g. hashCode) on a value typed T
                         --state.stackTop;
@@ -321,7 +318,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     int returnValueSlotCount = resolvedMethod.getReturnKind().getSlotCount();
 
                     TypeHints.TypeB returnType = null;
-                    if (invokeReturnTypeAttributes != null){
+                    if (returnTypeSig.byteAt(0) == 'L' && invokeReturnTypeAttributes != null){
                         for (InvokeReturnTypeAttribute.Entry invokeReturnTypeEntry : invokeReturnTypeAttributes) {
                             if (invokeReturnTypeEntry.bytecodeOffset() == bci) {
                                 returnType = invokeReturnTypeEntry.returnType();
@@ -329,6 +326,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                             }
                         }
                     }
+                    this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, returnType, true, false);
                     if (returnType != null) {
                         nonTrivial = true;
                     }
