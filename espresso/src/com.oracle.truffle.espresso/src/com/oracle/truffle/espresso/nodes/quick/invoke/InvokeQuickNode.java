@@ -42,9 +42,10 @@ public abstract class InvokeQuickNode extends QuickNode {
     protected final int resultAt;
     protected final int stackEffect;
     @CompilationFinal(dimensions = 1) protected final byte[] argsType;
-    @CompilationFinal protected final JavaKind returnKind;
+    @CompilationFinal protected final byte alternatedReturnType;
 
     // Helps check for no foreign objects
+    @CompilationFinal protected final JavaKind returnKind;
     private final boolean returnsPrimitive;
 
     public InvokeQuickNode(Method m, int top, int callerBCI) {
@@ -53,6 +54,7 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.resultAt = top -(SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.argsType = null;
+        this.alternatedReturnType = 0;
         this.returnKind = m.getReturnKind();
         this.returnsPrimitive = this.returnKind.isPrimitive();
     }
@@ -64,6 +66,7 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.resultAt = top - (SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.argsType = null;
+        this.alternatedReturnType = 0;
         this.returnKind = m.getReturnKind();
         this.returnsPrimitive = this.returnKind.isPrimitive();
     }
@@ -74,12 +77,8 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.resultAt = top -(SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.argsType = argsType;
-        if (returnType != 0) {
-            assert m.getReturnKind() == JavaKind.Object;
-            this.returnKind = TypeHints.toJavaKind(returnType);
-        } else {
-            this.returnKind = m.getReturnKind();
-        }
+        this.alternatedReturnType = returnType;
+        this.returnKind = m.getReturnKind();
         this.returnsPrimitive = this.returnKind.isPrimitive();
     }
 
@@ -90,12 +89,8 @@ public abstract class InvokeQuickNode extends QuickNode {
         this.resultAt = top - (SignatureSymbols.slotsForParameters(m.getParsedSignature()) + (m.hasReceiver() ? 1 : 0));
         this.stackEffect = (resultAt - top) + m.getReturnKind().getSlotCount();
         this.argsType = argsType;
-        if (returnType != 0) {
-            assert m.getReturnKind() == JavaKind.Object;
-            this.returnKind = TypeHints.toJavaKind(returnType);
-        } else {
-            this.returnKind = m.getReturnKind();
-        }
+        this.alternatedReturnType = returnType;
+        this.returnKind = m.getReturnKind();
         this.returnsPrimitive = this.returnKind.isPrimitive();
     }
 
@@ -151,10 +146,21 @@ public abstract class InvokeQuickNode extends QuickNode {
     }
 
     public final int pushResult(VirtualFrame frame, Object result) {
-        if (!returnsPrimitive) {
-            getBytecodeNode().checkNoForeignObjectAssumption((StaticObject) result);
+        if (this.returnKind == JavaKind.Object && alternatedReturnType != 0) {
+            switch (alternatedReturnType) {
+                case TypeHints.BYTE: EspressoFrame.putInt(frame, resultAt, (byte) result); break;
+                case TypeHints.CHAR: EspressoFrame.putInt(frame, resultAt, (char) result); break;
+                case TypeHints.DOUBLE: EspressoFrame.putReifiedDouble(frame, resultAt, (double) result); break;
+                case TypeHints.FLOAT: EspressoFrame.putFloat(frame, resultAt, (float) result); break;
+                case TypeHints.INT: EspressoFrame.putInt(frame, resultAt, (int) result); break;
+                case TypeHints.LONG: EspressoFrame.putReifiedLong(frame, resultAt, (long) result); break;
+                case TypeHints.SHORT: EspressoFrame.putInt(frame, resultAt, (short) result); break;
+                case TypeHints.BOOLEAN: EspressoFrame.putInt(frame, resultAt, ((boolean) result) ? 1 : 0); break;
+                default: EspressoFrame.putObject(frame, resultAt, (StaticObject) result);
+            }
+        } else {
+            EspressoFrame.putKind(frame, resultAt, result, this.returnKind);
         }
-        EspressoFrame.putKind(frame, resultAt, result, this.returnKind);
         return stackEffect;
         // if (!reifiedEnabled || returnTypeHint.isNoHint() || returnTypeHint.getKind() == TypeHints.REFERENCE){
         //     if (!returnsPrimitive) {

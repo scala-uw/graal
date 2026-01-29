@@ -26,12 +26,6 @@ public class TypeHintAnalysis {
     }
 
     private static boolean mayNeedAnalysis(Method method) {
-        if (method.getMethodParameterTypeAttribute() != null) {
-            return true;
-        }
-        if (method.getInvokeReturnTypeAttribute() != null) {
-            return true;
-        }
-        return false;
+        return (method.getMethodParameterTypeAttribute() != null) || (method.getInvokeReturnTypeAttribute() != null) || (method.getExtraBoxUnboxAttribute() != null);
     }
 }

@@ -487,6 +487,8 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
     private final byte[][] instOperandArrayElementTypes;
     @CompilationFinal(dimensions = 1)
     private final boolean[] ignoreInvoke;
+    @CompilationFinal(dimensions = 1)
+    private final int[] stackTopAdjustment;
 
     @CompilerDirectives.CompilationFinal
     public static final boolean DEBUG = false;
@@ -526,29 +528,34 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
         this.instOperandArrayElementTypes = new byte[this.bs.endBCI()][];
         this.invokeReturnTypes = new byte[this.bs.endBCI()];
         this.ignoreInvoke = new boolean[this.bs.endBCI()];
+        this.stackTopAdjustment = new int[this.bs.endBCI()];
         for (int i = 0; i < this.bs.endBCI(); ++i) {
             this.invokeReturnTypes[i] = 0;
             this.ignoreInvoke[i] = false;
+            this.stackTopAdjustment[i] = 0;
         }
         if (instOperandTypeHints != null) {
             for (int i = 0; i < instOperandTypeHints.length; ++i) {
                 if (instOperandTypeHints[i] != null) {
                     this.invokeReturnTypes[i] = (instOperandTypeHints[i].invokeReturnType != null) ? instOperandTypeHints[i].invokeReturnType.resolve(reifiedMethodTypeParams) : 0;
                     this.ignoreInvoke[i] = instOperandTypeHints[i].ignoreInvoke;
-                    int len = instOperandTypeHints[i].operands.length;
-                    instOperandTypes[i] = new byte[len];
-                    instOperandArrayElementTypes[i] = new byte[len];
-                    for (int j = 0; j < len; ++j) {
-                        if (instOperandTypeHints[i].operands[j] != null) {
-                            instOperandTypes[i][j] = instOperandTypeHints[i].operands[j].resolve(reifiedMethodTypeParams);
-                            if (instOperandTypeHints[i].operands[j].isGenericArray()) {
-                                instOperandArrayElementTypes[i][j] = instOperandTypeHints[i].operands[j].resolveArrayElement(reifiedMethodTypeParams);
+                    this.stackTopAdjustment[i] = instOperandTypeHints[i].stackTopAdjustment;
+                    if (instOperandTypeHints[i].operands != null) {
+                        int len = instOperandTypeHints[i].operands.length;
+                        instOperandTypes[i] = new byte[len];
+                        instOperandArrayElementTypes[i] = new byte[len];
+                        for (int j = 0; j < len; ++j) {
+                            if (instOperandTypeHints[i].operands[j] != null) {
+                                instOperandTypes[i][j] = instOperandTypeHints[i].operands[j].resolve(reifiedMethodTypeParams);
+                                if (instOperandTypeHints[i].operands[j].isGenericArray()) {
+                                    instOperandArrayElementTypes[i][j] = instOperandTypeHints[i].operands[j].resolveArrayElement(reifiedMethodTypeParams);
+                                } else {
+                                    instOperandArrayElementTypes[i][j] = 0;
+                                }
                             } else {
+                                instOperandTypes[i][j] = 0;
                                 instOperandArrayElementTypes[i][j] = 0;
                             }
-                        } else {
-                            instOperandTypes[i][j] = 0;
-                            instOperandArrayElementTypes[i][j] = 0;
                         }
                     }
                 }
@@ -1500,8 +1507,22 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
                     case INVOKESPECIAL: // fall through
                     case INVOKESTATIC:  // fall through
                     case INVOKEINTERFACE:
-                        if (this.ignoreInvoke != null && this.ignoreInvoke[curBCI]) {
-                            top -= Bytecodes.stackEffectOf(curOpcode);
+                        if (this.ignoreInvoke[curBCI]) {
+                            if (this.stackTopAdjustment[curBCI] != 0) {
+                                assert this.instOperandTypes[curBCI][0] == 'J' || this.instOperandTypes[curBCI][0] == 'D';
+                                if (this.instOperandTypes[curBCI][0] == 'J') {
+                                    long v = frame.getLongStatic(top - 1);
+                                    frame.clearPrimitiveStatic(top - 1);
+                                    frame.setLongStatic(top + this.stackTopAdjustment[curBCI] - 1, v);
+                                } else {
+                                    double v = frame.getDoubleStatic(top - 1);
+                                    frame.clearPrimitiveStatic(top - 1);
+                                    frame.setDoubleStatic(top + this.stackTopAdjustment[curBCI] - 1, v);
+                                }
+                                top += this.stackTopAdjustment[curBCI] - Bytecodes.stackEffectOf(curOpcode);
+                            } else {
+                                top -= Bytecodes.stackEffectOf(curOpcode);
+                            }
                         } else {
                             top += quickenInvoke(frame, top, curBCI, curOpcode, statementIndex);
                         }
@@ -2692,7 +2713,7 @@ public final class BytecodeNode extends AbstractInstrumentableBytecodeNode imple
             return new InvokeHandleNode(resolved, resolvedInvoke.invoker(), top, curBCI);
         } else {
             // @formatter:off
-            if (this.instOperandTypes[curBCI] != null) {
+            if (this.instOperandTypes[curBCI] != null || this.invokeReturnTypes[curBCI] != 0) {
                 return switch (callKind) {
                     case STATIC          -> new InvokeStaticQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI], this.invokeReturnTypes[curBCI]);
                     case ITABLE_LOOKUP   -> new InvokeInterfaceQuickNode(resolved, top, curBCI, this.instOperandTypes[curBCI], this.invokeReturnTypes[curBCI]);

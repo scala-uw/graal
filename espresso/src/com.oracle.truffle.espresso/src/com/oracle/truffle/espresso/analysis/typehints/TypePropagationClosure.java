@@ -167,12 +167,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     assert state.stackTop > 0;
                     this.resAtBCI[bci] = new TypeAnalysisResult(new TypeHints.TypeB[]{state.stack[state.stackTop - 1]});
                     if (state.stackTop > 0){
-                        if (state.stack[state.stackTop - 1] == null){
-                            state.locals[astoreIndex] = null;
-                        }
-                        else {
-                            state.locals[astoreIndex] = state.stack[state.stackTop - 1];
-                        }
+                        state.locals[astoreIndex] = state.stack[state.stackTop - 1];
                         state.stackTop--;
                         state.stack[state.stackTop] = null;
                     } else {
@@ -187,11 +182,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     int aloadIndex = opcode == ALOAD ? bs.readLocalIndex(bci) : (opcode - ALOAD_0);
                     this.resAtBCI[bci] = new TypeAnalysisResult(new TypeHints.TypeB[]{state.locals[aloadIndex]});
                     if (debug) System.out.println("Aload index: " + aloadIndex + " locals at index: " + state.locals[aloadIndex]);
-                    if (state.locals[aloadIndex] == null){
-                        state.stack[state.stackTop] = null;
-                    } else {
-                        state.stack[state.stackTop] = state.locals[aloadIndex];
-                    }
+                    state.stack[state.stackTop] = state.locals[aloadIndex];
                     state.stackTop++;
                     break;
                 case GETSTATIC:
@@ -266,7 +257,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                         TypeHints.TypeB[] argsHint = new TypeHints.TypeB[2];
                         assert state.stack[state.stackTop - 1] == null;
                         argsHint[0] = xs_type;
-                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, null, false, false);
+                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, null, false);
                         state.stackTop -= 2;
                         break;
                     }
@@ -275,7 +266,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                         argsHint[0] = state.stack[state.stackTop - 3];
                         assert state.stack[state.stackTop - 2] == null;
                         argsHint[2] = state.stack[state.stackTop - 1];
-                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, null, false, false);
+                        this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, null, false);
                         state.stackTop -= 4;
                         break;
                     }
@@ -288,14 +279,27 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                     if (ignoredCalls.contains(bci)) {
                         assert resolvedMethod.isStatic() && paramCnt == 1;
                         Symbol<Type> inputTypeSig = SignatureSymbols.parameterType(signature, 0);
-                        if (TypeHints.isPrimitive(inputTypeSig.byteAt(0))) {
+                        int stackTopAdjustment = 0;
+                        TypeHints.TypeB[] operands = new TypeHints.TypeB[1];
+                        if (TypeHints.isPrimitive(inputTypeSig.byteAt(0))) { // boxing
+                            operands[0] = new TypeHints.TypeB(inputTypeSig.byteAt(0), -1);
+                            if (inputTypeSig.byteAt(0) == 'J' || inputTypeSig.byteAt(0) == 'D') {
+                                stackTopAdjustment = -1;
+                                state.stackTop -= 1;
+                            }
                             state.stack[state.stackTop - 1] = new TypeHints.TypeB(inputTypeSig.byteAt(0), -1);
-                        } else if (TypeHints.isPrimitive(returnTypeSig.byteAt(0))) {
+                        } else { // unboxing
+                            assert TypeHints.isPrimitive(returnTypeSig.byteAt(0));
                             assert state.stack[state.stackTop - 1].getKind() == returnTypeSig.byteAt(0);
+                            operands[0] = new TypeHints.TypeB(returnTypeSig.byteAt(0), -1);
                             state.stack[state.stackTop - 1] = null; // Its type in bytecode is no longer a reference
+                            if (returnTypeSig.byteAt(0) == 'J' || returnTypeSig.byteAt(0) == 'D') {
+                                stackTopAdjustment = 1;
+                                state.stackTop += 1;
+                            }
                         }
                         nonTrivial = true;
-                        this.resAtBCI[bci] = new TypeAnalysisResult(new TypeHints.TypeB[0], null, true, true);
+                        this.resAtBCI[bci] = new TypeAnalysisResult(operands, stackTopAdjustment);
                         break;
                     }
 
@@ -326,7 +330,7 @@ public class TypePropagationClosure extends BlockIteratorClosure{
                             }
                         }
                     }
-                    this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, returnType, true, false);
+                    this.resAtBCI[bci] = new TypeAnalysisResult(argsHint, returnType, false);
                     if (returnType != null) {
                         nonTrivial = true;
                     }
